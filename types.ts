@@ -1,0 +1,86 @@
+
+export enum ScenarioType {
+  REALISTA = 'Realista',
+  PESSIMISTA = 'Pessimista',
+  OTIMISTA = 'Otimista'
+}
+
+export interface SimulationParams {
+  ridesPerDriverDay: number;
+  avgFare: number;
+  takeRate: number;
+  activeDrivers: number;
+  driverAdditionMonthly: number;
+  ridesPerUserMonth: number; // Novo: Frequência de uso por usuário
+  initialRides: number;
+  fixedCosts: number;
+  userGrowth: number;
+  initialInvestment: number;
+  marketingMonthly: number;
+  techMonthly: number;
+  cancellationRate: number;
+  driverGrowth: number;
+  
+  // Marketing Campaigns
+  adesaoTurbo: number;
+  trafegoPago: number;
+  parceriasBares: number;
+  indiqueGanhe: number;
+
+  // Operational Params
+  apiMaintenanceRate: number;
+  chargebackReserveRate: number;
+  churnRate: number;
+  bankFeeRate: number; // Novo: Taxa bancária em %
+  isMaintenanceActive: boolean; // Novo: Interruptor de custos de manutenção
+}
+
+export interface MonthlyResult {
+  month: number;
+  year: number;
+  monthName: string;
+  drivers: number;
+  users: number; 
+  rides: number;
+  grossRevenue: number;
+  takeRateGross: number; // 15% fixo na fonte
+  cashback: number; // Diferença devolvida ao motorista
+  takeRateRevenue: number; // Receita líquida TKX
+  taxes: number;
+  variableCosts: number;
+  fixedCosts: number;
+  marketing: number;
+  tech: number;
+  campaignCosts: number;
+  ebitda: number;
+  netProfit: number;
+  accumulatedProfit: number;
+  margin: number;
+  contributionMargin: number;
+  cac: number;
+  ltv: number;
+  grossPerDriver: number;
+  netPerDriver: number;
+  ridesPerDriver: number; 
+  ridesPerDriverDay: number;
+}
+
+export interface YearAudit {
+  year: number;
+  totalGMV: number;
+  totalRevenue: number;
+  totalCashback: number;
+  totalNetProfit: number;
+  totalEbitda: number;
+  totalRides: number;
+  avgMonthlyProfit: number;
+  avgRidesPerDriverDay: number;
+  growthFromPrev: number;
+  bestMonth: string;
+  worstMonth: string;
+  // Novos campos para visão executiva
+  endUsers: number;
+  endDrivers: number;
+  avgMonthlyRides: number;
+  totalOpCosts: number;
+}
