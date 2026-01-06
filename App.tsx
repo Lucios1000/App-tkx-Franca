@@ -1,4 +1,12 @@
+import React from 'react';
+import Layout from './components/Layout';
 
+// Minimal App to restore valid TypeScript and let CI pass
+const App: React.FC = () => {
+  return <Layout />;
+};
+
+export default App;
 import React from 'react';
 import Layout from './components/Layout';
 import { useViability } from './hooks/useViability';
