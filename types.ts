@@ -58,8 +58,8 @@ export interface MonthlyResult {
   accumulatedProfit: number;
   margin: number;
   contributionMargin: number;
-  cac: number;
-  ltv: number;
+  cac: number; // CAC Realista: Marketing Total / Novos Usuários
+  ltv: number; // LTV Dinâmico: Margem por Usuário / Churn Rate
   grossPerDriver: number;
   netPerDriver: number;
   ridesPerDriver: number; 

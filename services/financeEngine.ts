@@ -114,9 +114,13 @@ export const calculateProjections = (
     taxes = takeRateGross * 0.112;
 
     // Marketing (CAC): base condicional (R$3.000) + 1,50 por NOVO usuário adicionado
+    // + investimento em campanhas específicas
     const newUsersAdded = Math.max(0, currentUsers - previousUsers);
     const marketingBase = params.applyMinimumCosts ? 3000 : 0;
-    totalMarketing = marketingBase + (1.5 * newUsersAdded);
+    const campaignSpend = (params.adesaoTurbo || 0) + (params.trafegoPago || 0) + 
+                          (params.parceriasBares || 0) + (params.indiqueGanhe || 0);
+    const totalMarketingInvestment = marketingBase + (1.5 * newUsersAdded) + campaignSpend;
+    totalMarketing = totalMarketingInvestment;
 
     // Tecnologia/APIs: 0,15 por corrida
     totalTech = actualRides * 0.15;
@@ -135,10 +139,16 @@ export const calculateProjections = (
     
     accumulatedProfit += netProfit;
 
+    // LTV Dinâmico: Margem de Contribuição Média por Usuário / Taxa de Churn
+    // Margem de Contribuição = Receita (TKX) - Impostos - Custos Variáveis
     const contributionMarginVal = takeRateRevenue - taxes - variableCosts;
     const avgMarginPerUser = currentUsers > 0 ? contributionMarginVal / currentUsers : 0;
     const ltv = userChurnRate > 0 ? avgMarginPerUser / userChurnRate : 0;
-    const cac = newUsersAdded > 0 ? totalMarketing / newUsersAdded : 0;
+    
+    // CAC Realista: Total de Investimento em Marketing / Número de Novos Usuários Adquiridos
+    // Inclui base fixa, variável por usuário, e campanhas específicas
+    const grossNewUsersForCAC = Math.max(newUsersAdded, 0.1); // evita divisão por zero
+    const cac = grossNewUsersForCAC > 0 ? totalMarketingInvestment / grossNewUsersForCAC : 0;
 
     results.push({
       month: m + 1,

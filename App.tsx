@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Layout from './components/Layout';
+import SnapshotModal from './components/SnapshotModal';
 import { useViability } from './hooks/useViability';
+import { useSnapshots } from './hooks/useSnapshots';
 import { ScenarioType, MonthlyResult } from './types';
 import { FRANCA_STATS } from './constants';
 import {
@@ -94,12 +96,26 @@ const App: React.FC = () => {
     audits,
     filteredDreResults,
     updateCurrentParam,
+    updateParam,
     resetParams,
     supplyBottleneck,
     oversupplyWarning,
     paramsMap,
     calculateProjections,
   } = useViability();
+
+  const {
+    snapshots,
+    saveSnapshot,
+    deleteSnapshot,
+    renameSnapshot,
+    exportSnapshots,
+    exportSingleSnapshot,
+    importSnapshots,
+    duplicateSnapshot,
+  } = useSnapshots();
+
+  const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
 
   const currentMonth = projections[0];
   const lastMonth = projections[projections.length - 1];
@@ -126,6 +142,25 @@ const App: React.FC = () => {
     });
     return { y1: calcYear(y1), y2: calcYear(y2), y3: calcYear(y3) };
   }, [projections]);
+
+  // Handlers para Snapshots
+  const handleSaveSnapshot = (name: string, description: string) => {
+    saveSnapshot(name, paramsMap, scenario, description);
+    alert(`✅ Snapshot "${name}" salvo com sucesso!`);
+  };
+
+  const handleLoadSnapshot = (snap: any) => {
+    Object.keys(snap.paramsMap).forEach((sc: any) => {
+      const scenarioKey = sc as ScenarioType;
+      const params = snap.paramsMap[scenarioKey];
+      Object.keys(params).forEach((key: any) => {
+        updateParam(scenarioKey, key as any, params[key]);
+      });
+    });
+    setScenario(snap.activeScenario);
+    alert(`✅ Snapshot "${snap.name}" carregado!`);
+    setIsSnapshotModalOpen(false);
+  };
 
   const renderScenarioSelector = () => (
     <div className="flex flex-wrap gap-2">
@@ -432,22 +467,32 @@ const App: React.FC = () => {
     const first = projections[0];
     const ratio = (last?.ltv || 0) / ((last?.cac || 1));
     const cagr = Math.pow(projections[11].grossRevenue / (first?.grossRevenue || 1), 1/2) - 1;
+    
+    // Dados para gráfico de evolução LTV/CAC
+    const ltvCacData = projections.map(p => ({
+      month: p.month,
+      monthName: p.monthName,
+      ltv: p.ltv,
+      cac: p.cac,
+      ratio: p.cac > 0 ? p.ltv / p.cac : 0
+    }));
+    
     return (
       <div className="space-y-3">
         <h3 className="text-xs font-black uppercase text-yellow-400 tracking-[0.08em]">KPIs de Viabilidade</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="card-gradient hover-lift bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-slate-700/40 p-3 rounded-lg">
-            <div className="text-[7px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-1">LTV</div>
+            <div className="text-[7px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-1">LTV (M36)</div>
             <div className="text-lg font-black text-green-400"><CurrencyDisplay value={last?.ltv} /></div>
             <div className="text-[9px] text-slate-400 mt-1">Lifetime Value</div>
           </div>
           <div className="card-gradient hover-lift bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border border-slate-700/40 p-3 rounded-lg">
-            <div className="text-[7px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-1">CAC</div>
+            <div className="text-[7px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-1">CAC (M36)</div>
             <div className="text-lg font-black text-yellow-400"><CurrencyDisplay value={last?.cac} /></div>
             <div className="text-[9px] text-slate-400 mt-1">Customer Acquisition</div>
           </div>
           <div className={`card-gradient hover-lift bg-gradient-to-br ${ratio >= 3 ? 'from-green-500/10 to-emerald-500/5' : 'from-orange-500/10 to-amber-500/5'} border border-slate-700/40 p-3 rounded-lg`}>
-            <div className="text-[7px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-1">LTV/CAC</div>
+            <div className="text-[7px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-1">LTV/CAC (M36)</div>
             <div className={`text-lg font-black ${ratio >= 3 ? 'text-green-400' : ratio >= 1 ? 'text-yellow-400' : 'text-red-400'}`}>{ratio.toFixed(2)}x</div>
             <div className="text-[9px] text-slate-400 mt-1">Unit Economics</div>
           </div>
@@ -456,6 +501,27 @@ const App: React.FC = () => {
             <div className="text-lg font-black text-blue-400">{(cagr * 100).toFixed(1)}%</div>
             <div className="text-[9px] text-slate-400 mt-1">Crescimento Anual</div>
           </div>
+        </div>
+        
+        {/* Gráfico de Evolução LTV/CAC */}
+        <div className="card-gradient border border-slate-700/40 rounded-xl p-4 bg-slate-900/50">
+          <div className="text-[8px] uppercase text-slate-400 font-black mb-3 tracking-[0.08em]">Evolução de LTV, CAC e Ratio ao Longo de 36 Meses</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <ComposedChart data={ltvCacData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="monthName" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
+              <YAxis yAxisId="left" tick={{ fontSize: 9 }} stroke="#64748b" />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9 }} stroke="#94a3b8" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#020617', border: 'none', borderRadius: 8, fontSize: 10 }}
+                formatter={(value) => typeof value === 'number' ? formatCurrency(value) : value}
+              />
+              <Legend wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
+              <Line yAxisId="left" type="monotone" dataKey="ltv" name="LTV" stroke="#10b981" strokeWidth={2} dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="cac" name="CAC" stroke="#f59e0b" strokeWidth={2} dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="ratio" name="LTV/CAC Ratio" stroke="#3b82f6" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </div>
     );
@@ -867,12 +933,17 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-      <div className="space-y-5 text-white">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between p-5 rounded-xl bg-gradient-to-br from-slate-900/70 to-slate-800/50 border border-slate-700/40 shadow-lg">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 bg-clip-text text-transparent">TKX Franca Dashboard</h1>
-            <p className="text-slate-400 text-xs mt-1 font-medium">Cenário: <span className="text-yellow-400 font-bold">{SCENARIO_LABEL[scenario]}</span></p>
+    <>
+      <Layout 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab}
+        onOpenSnapshots={() => setIsSnapshotModalOpen(true)}
+      >
+        <div className="space-y-5 text-white">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between p-5 rounded-xl bg-gradient-to-br from-slate-900/70 to-slate-800/50 border border-slate-700/40 shadow-lg">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 bg-clip-text text-transparent">TKX Franca Dashboard</h1>
+              <p className="text-slate-400 text-xs mt-1 font-medium">Cenário: <span className="text-yellow-400 font-bold">{SCENARIO_LABEL[scenario]}</span></p>
           </div>
           {renderScenarioSelector()}
         </div>
@@ -920,7 +991,24 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
-    </Layout>
+      </Layout>
+
+      <SnapshotModal
+        isOpen={isSnapshotModalOpen}
+        onClose={() => setIsSnapshotModalOpen(false)}
+        snapshots={snapshots}
+        onSaveSnapshot={handleSaveSnapshot}
+        onLoadSnapshot={handleLoadSnapshot}
+        onDeleteSnapshot={deleteSnapshot}
+        onRenameSnapshot={renameSnapshot}
+        onDuplicateSnapshot={duplicateSnapshot}
+        onExportSnapshot={exportSingleSnapshot}
+        onExportAll={exportSnapshots}
+        onImport={importSnapshots}
+        currentParamsMap={paramsMap}
+        currentScenario={scenario}
+      />
+    </>
   );
 };
 

@@ -1,5 +1,5 @@
 
-import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone, Zap } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone, Zap, Save } from 'lucide-react';
 import React from 'react';
 
 interface LayoutProps {
@@ -8,9 +8,10 @@ interface LayoutProps {
   setActiveTab: (tab: number) => void;
   onExportPDF?: () => void;
   onExportExcel?: () => void;
+  onOpenSnapshots?: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onExportPDF, onExportExcel }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onExportPDF, onExportExcel, onOpenSnapshots }) => {
   const tabs = [
     { id: 0, label: 'CALOR / DEMANDA', icon: <MapIcon size={22} /> },
     { id: 1, label: 'BENCH / MARKET SHARE', icon: <Users size={22} /> },
@@ -48,6 +49,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onEx
           
           <div className="flex items-center gap-2">
             <div className="flex items-center bg-slate-950 rounded-lg p-1 border border-slate-800 mr-2">
+              <button 
+                type="button"
+                onClick={(e) => { e.preventDefault(); onOpenSnapshots?.(); }}
+                title="Gerenciar Snapshots (Histórico)"
+                className="p-2 text-slate-400 hover:text-cyan-400 transition-colors"
+              >
+                <Save size={16} />
+              </button>
+              <div className="w-px h-4 bg-slate-800 mx-1"></div>
               <button 
                 type="button"
                 onClick={(e) => { e.preventDefault(); onExportPDF?.(); }}
