@@ -734,7 +734,6 @@ const App: React.FC = () => {
           {scenariosData.map((s) => (
             <div key={s.type} className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
               <div className="text-[10px] uppercase text-slate-400 font-black">{SCENARIO_LABEL[s.type]}</div>
-              <div className={`text-xl font-black ${s.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>Lucro 36m: {formatCurrency(s.totalProfit)}</div>
               <div className="text-sm text-slate-300">Break-even: {s.breakEvenIdx !== -1 ? `Mês ${s.breakEvenIdx + 1}` : '—'}</div>
               <div className="text-sm text-slate-300">Payback: {s.paybackIdx !== -1 ? `Mês ${s.paybackIdx + 1}` : '—'}</div>
               <div className="text-sm text-slate-300">Share M36: {s.share.toFixed(1)}%</div>
