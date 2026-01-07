@@ -570,8 +570,14 @@ const App: React.FC = () => {
   };
 
   const renderCenarios = () => {
+    const scenarioProjections: Record<ScenarioType, MonthlyResult[]> = {
+      [ScenarioType.REALISTA]: calculateProjections(paramsMap[ScenarioType.REALISTA], ScenarioType.REALISTA),
+      [ScenarioType.PESSIMISTA]: calculateProjections(paramsMap[ScenarioType.PESSIMISTA], ScenarioType.PESSIMISTA),
+      [ScenarioType.OTIMISTA]: calculateProjections(paramsMap[ScenarioType.OTIMISTA], ScenarioType.OTIMISTA),
+    };
+
     const scenariosData = Object.values(ScenarioType).map((t) => {
-      const proj = calculateProjections(paramsMap[t], t as ScenarioType);
+      const proj = scenarioProjections[t];
       const last = proj[proj.length - 1];
       const totalProfit = proj.reduce((a, b) => a + b.netProfit, 0);
       const breakEvenIdx = proj.findIndex((r) => r.netProfit > 0);
@@ -584,8 +590,126 @@ const App: React.FC = () => {
       const profitY3 = y3.reduce((a, m) => a + m.netProfit, 0);
       return { type: t as ScenarioType, totalProfit, breakEvenIdx, paybackIdx, share: (last.users / FRANCA_STATS.digitalUsers) * 100, profitY1, profitY2, profitY3 };
     });
+
+    const formatDelta = (current: number, previous?: number | null) => {
+      if (previous === undefined || previous === null) return null;
+      if (Math.abs(previous) < 1e-6) return null;
+      return ((current - previous) / Math.abs(previous)) * 100;
+    };
+
+    const DeltaBadge: React.FC<{ delta: number | null }> = ({ delta }) => {
+      if (delta === null) return <span className="text-slate-500 text-[10px]">—</span>;
+      const arrow = delta >= 0 ? '▲' : '▼';
+      const color = delta >= 0 ? 'text-green-400' : 'text-red-400';
+      return <span className={`text-[11px] font-bold ${color}`}>{arrow} {Math.abs(delta).toFixed(1)}%</span>;
+    };
+
+    const buildCardData = (proj: MonthlyResult[], month: number, prevMonth?: number) => {
+      const current = proj[month - 1];
+      const prev = prevMonth ? proj[prevMonth - 1] : null;
+      const opCosts = current.variableCosts + current.fixedCosts + current.tech + current.marketing;
+      const opCostsPrev = prev ? prev.variableCosts + prev.fixedCosts + prev.tech + prev.marketing : null;
+      return {
+        month,
+        drivers: { value: current.drivers, delta: formatDelta(current.drivers, prev?.drivers) },
+        users: { value: current.users, delta: formatDelta(current.users, prev?.users) },
+        revenue: { value: current.grossRevenue, delta: formatDelta(current.grossRevenue, prev?.grossRevenue) },
+        takeRate: { value: current.takeRateRevenue, delta: formatDelta(current.takeRateRevenue, prev?.takeRateRevenue) },
+        taxes: { value: current.taxes, delta: formatDelta(current.taxes, prev?.taxes) },
+        opCosts: { value: opCosts, delta: formatDelta(opCosts, opCostsPrev) },
+        profit: { value: current.netProfit, delta: formatDelta(current.netProfit, prev?.netProfit) },
+      };
+    };
+
+    const semestralComparisons = Object.values(ScenarioType).map((t) => {
+      const proj = scenarioProjections[t];
+      const blocoJunho = [
+        buildCardData(proj, 6),
+        buildCardData(proj, 18, 6),
+        buildCardData(proj, 30, 18),
+      ];
+      const blocoDez = [
+        buildCardData(proj, 12),
+        buildCardData(proj, 24, 12),
+        buildCardData(proj, 36, 24),
+      ];
+      return { type: t as ScenarioType, blocoJunho, blocoDez };
+    });
+
+    const renderMetricRow = (label: string, data: { value: number; delta: number | null }) => (
+      <div className="flex items-center justify-between text-xs text-slate-200">
+        <span className="text-slate-400">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-semibold">{label.includes('Usuários') || label.includes('Frota') ? formatNumber(data.value) : formatCurrency(data.value)}</span>
+          <DeltaBadge delta={data.delta} />
+        </div>
+      </div>
+    );
     return (
       <div className="space-y-6">
+        <h3 className="text-sm font-black uppercase text-yellow-500">Comparativo Semestral (Cards)</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {semestralComparisons.map((s) => (
+            <div key={s.type} className="bg-slate-900/70 border border-slate-800/60 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] uppercase text-slate-400 font-black">{SCENARIO_LABEL[s.type]}</div>
+                  <div className="text-xs text-slate-500">Curva S + MPD 10,1</div>
+                </div>
+                <span className="text-[10px] px-2 py-1 rounded-full bg-slate-800 text-yellow-400 font-black">36m</span>
+              </div>
+
+              {/* 1º Semestre (Junho) */}
+              <div className="space-y-2">
+                <div className="text-[10px] uppercase text-yellow-400 font-black">1º Semestre (Junho)</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {s.blocoJunho.map((card, idx) => (
+                    <div key={`jun-${card.month}`} className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-black text-slate-200">
+                        <span>{idx === 0 ? 'Ano 1 (M6)' : idx === 1 ? 'Ano 2 (M18)' : 'Ano 3 (M30)'}</span>
+                        <span className="text-slate-500">vs {idx === 0 ? '—' : idx === 1 ? 'M6' : 'M18'}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {renderMetricRow('Frota', card.drivers)}
+                        {renderMetricRow('Usuários', card.users)}
+                        {renderMetricRow('Receita Bruta', card.revenue)}
+                        {renderMetricRow('Take Rate', card.takeRate)}
+                        {renderMetricRow('Impostos', card.taxes)}
+                        {renderMetricRow('Custos Operacionais', card.opCosts)}
+                        {renderMetricRow('Lucro Líquido', card.profit)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2º Semestre (Dezembro) */}
+              <div className="space-y-2">
+                <div className="text-[10px] uppercase text-yellow-400 font-black">2º Semestre (Dezembro)</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {s.blocoDez.map((card, idx) => (
+                    <div key={`dez-${card.month}`} className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-black text-slate-200">
+                        <span>{idx === 0 ? 'Ano 1 (M12)' : idx === 1 ? 'Ano 2 (M24)' : 'Ano 3 (M36)'}</span>
+                        <span className="text-slate-500">vs {idx === 0 ? '—' : idx === 1 ? 'M12' : 'M24'}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {renderMetricRow('Frota', card.drivers)}
+                        {renderMetricRow('Usuários', card.users)}
+                        {renderMetricRow('Receita Bruta', card.revenue)}
+                        {renderMetricRow('Take Rate', card.takeRate)}
+                        {renderMetricRow('Impostos', card.taxes)}
+                        {renderMetricRow('Custos Operacionais', card.opCosts)}
+                        {renderMetricRow('Lucro Líquido', card.profit)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <h3 className="text-sm font-black uppercase text-yellow-500">Comparação de Cenários (36 meses)</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {scenariosData.map((s) => (
@@ -614,9 +738,9 @@ const App: React.FC = () => {
             <LineChart
               data={Array.from({ length: 36 }, (_, i) => ({
                 month: i + 1,
-                Realista: calculateProjections(paramsMap[ScenarioType.REALISTA], ScenarioType.REALISTA)[i].accumulatedProfit,
-                Pessimista: calculateProjections(paramsMap[ScenarioType.PESSIMISTA], ScenarioType.PESSIMISTA)[i].accumulatedProfit,
-                Otimista: calculateProjections(paramsMap[ScenarioType.OTIMISTA], ScenarioType.OTIMISTA)[i].accumulatedProfit,
+                Realista: scenarioProjections[ScenarioType.REALISTA][i].accumulatedProfit,
+                Pessimista: scenarioProjections[ScenarioType.PESSIMISTA][i].accumulatedProfit,
+                Otimista: scenarioProjections[ScenarioType.OTIMISTA][i].accumulatedProfit,
               }))}
             >
               <CartesianGrid stroke="#1e293b" vertical={false} />
