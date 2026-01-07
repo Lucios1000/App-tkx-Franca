@@ -1,5 +1,5 @@
 
-import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone, Zap } from 'lucide-react';
 import React from 'react';
 
 interface LayoutProps {
@@ -24,6 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onEx
     { id: 9, label: 'Cenários', icon: <Target size={22} /> },
     { id: 10, label: 'Geral', icon: <LayoutDashboard size={22} /> },
     { id: 11, label: 'VISÃO 360º', icon: <Briefcase size={22} /> },
+    { id: 12, label: 'RESUMO EXECUTIVO', icon: <Zap size={22} /> },
   ];
 
   return (

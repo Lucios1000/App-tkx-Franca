@@ -33,6 +33,7 @@ export interface SimulationParams {
   churnRate: number;
   bankFeeRate: number; // Novo: Taxa bancária em %
   isMaintenanceActive: boolean; // Novo: Interruptor de custos de manutenção
+  applyMinimumCosts: boolean; // Toggle para ativar/desativar custos mínimos fixos e marketing
 }
 
 export interface MonthlyResult {

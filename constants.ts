@@ -45,7 +45,8 @@ export const INITIAL_PARAMS: SimulationParams = {
   chargebackReserveRate: 1,
   churnRate: 2,
   bankFeeRate: 3.0,
-  isMaintenanceActive: true
+  isMaintenanceActive: true,
+  applyMinimumCosts: true // Por padrão, aplicar custos mínimos (realista)
 };
 
 export const MONTH_NAMES = [

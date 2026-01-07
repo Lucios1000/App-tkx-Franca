@@ -113,9 +113,10 @@ export const calculateProjections = (
     // Impostos: 11,2% sobre Receita Bruta da TKX (takeRateGross)
     taxes = takeRateGross * 0.112;
 
-    // Marketing (CAC): 3000 fixos + 1,50 por NOVO usuário adicionado
+    // Marketing (CAC): base condicional (R$3.000) + 1,50 por NOVO usuário adicionado
     const newUsersAdded = Math.max(0, currentUsers - previousUsers);
-    totalMarketing = 3000 + (1.5 * newUsersAdded);
+    const marketingBase = params.applyMinimumCosts ? 3000 : 0;
+    totalMarketing = marketingBase + (1.5 * newUsersAdded);
 
     // Tecnologia/APIs: 0,15 por corrida
     totalTech = actualRides * 0.15;
@@ -124,9 +125,10 @@ export const calculateProjections = (
     const bankFees = (actualRides * 0.40) + (grossRevenue * 0.02);
     variableCosts = bankFees;
     
-    // Fixos escalonados: R$8.000 (meses 1-6) e +50% a cada semestre
-    const semestersPassed = Math.floor(m / 6); // m=0..5 -> 0; m=6..11 -> 1; etc.
-    const currentFixedCosts = 8000 * Math.pow(1.5, semestersPassed);
+    // Fixos escalonados: base condicional (R$8.000) e +50% a cada semestre
+    const semestersPassed = Math.floor(m / 6);
+    const fixedBase = params.applyMinimumCosts ? 8000 : 0;
+    const currentFixedCosts = fixedBase * Math.pow(1.5, semestersPassed);
     
     const ebitda = takeRateRevenue - taxes - variableCosts - currentFixedCosts - totalTech - totalMarketing;
     const netProfit = ebitda; 
