@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.1 - 2026-01-08
+
+- Eventos: KPIs, distribuição Curva S (intensidade/pico), gráfico com pico, e exportação Excel com abas "Eventos" e "Eventos_Diário".
+- Campanhas: suspensão/restauração por cenário, com persistência local e sincronização de backup. Sliders afetados desabilitados e zerados durante suspensão.
+- Não-afetados preservados: Mídia OFF e Tráfego Pago mantidos ativos; restauração retorna aos valores antes da suspensão.
+- MKT/CF: Prioridade visual para "Despesas Básicas" e "Marketing"; remoção de gating por "Custos Mínimos".
+- Seletores estáveis (data-testid) para botões e sliders, visando robustez de testes.
+- E2E: Adicionado `e2e/campaigns.spec.ts` (suspender/restaurar + persistência por cenário) e ampliado `e2e/events.spec.ts` (KPIs + exportação).
+- Correções: ajustes em `renderKpis` e melhorias de sincronização/backup.
+
+Notas:
+- CI/E2E e Lighthouse configurados; GitHub Pages para preview.
+- PWA habilitado (manifest + service worker) via Vite Plugin PWA.# Changelog
+
 ## v0.1.1 — Unreleased
 
 ### Added

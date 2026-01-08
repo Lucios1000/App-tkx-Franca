@@ -181,15 +181,18 @@ const App: React.FC = () => {
     eliteDriversSemestral: number;
     fidelidadePassageirosAnual: number;
     reservaOperacionalGMV: number;
+    // Não afetados pela suspensão, mas restaurados exatamente
+    mktMensalOff: number;
+    trafegoPago: number;
   }>>(() => {
     try {
       const saved = localStorage.getItem('tkx_campaigns_backup');
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
-      [ScenarioType.REALISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0 },
-      [ScenarioType.PESSIMISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0 },
-      [ScenarioType.OTIMISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0 },
+      [ScenarioType.REALISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0, mktMensalOff: 0, trafegoPago: 0 },
+      [ScenarioType.PESSIMISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0, mktMensalOff: 0, trafegoPago: 0 },
+      [ScenarioType.OTIMISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0, mktMensalOff: 0, trafegoPago: 0 },
     };
   });
   const campaignsSuspended = campaignsSuspendedMap[scenario] || false;
@@ -199,16 +202,39 @@ const App: React.FC = () => {
   useEffect(() => {
     try { localStorage.setItem('tkx_campaigns_backup', JSON.stringify(campaignsBackupMap)); } catch {}
   }, [campaignsBackupMap]);
+
+  // Mantém backup sempre atualizado enquanto não estiver suspenso
+  useEffect(() => {
+    const cur = paramsMap[scenario];
+    if (!campaignsSuspended && cur) {
+      setCampaignsBackupMap(prev => ({
+        ...prev,
+        [scenario]: {
+          adesaoTurbo: cur.adesaoTurbo || 0,
+          parceriasBares: cur.parceriasBares || 0,
+          indiqueGanhe: cur.indiqueGanhe || 0,
+          eliteDriversSemestral: cur.eliteDriversSemestral || 0,
+          fidelidadePassageirosAnual: cur.fidelidadePassageirosAnual || 0,
+          reservaOperacionalGMV: cur.reservaOperacionalGMV || 0,
+          mktMensalOff: cur.mktMensalOff || 0,
+          trafegoPago: cur.trafegoPago || 0,
+        }
+      }));
+    }
+  }, [paramsMap, scenario, campaignsSuspended]);
   const suspendCampaigns = () => {
+    const snapshot = paramsMap[scenario];
     setCampaignsBackupMap(prev => ({
       ...prev,
       [scenario]: {
-        adesaoTurbo: currentParams.adesaoTurbo || 0,
-        parceriasBares: currentParams.parceriasBares || 0,
-        indiqueGanhe: currentParams.indiqueGanhe || 0,
-        eliteDriversSemestral: currentParams.eliteDriversSemestral || 0,
-        fidelidadePassageirosAnual: currentParams.fidelidadePassageirosAnual || 0,
-        reservaOperacionalGMV: currentParams.reservaOperacionalGMV || 0,
+        adesaoTurbo: snapshot.adesaoTurbo || 0,
+        parceriasBares: snapshot.parceriasBares || 0,
+        indiqueGanhe: snapshot.indiqueGanhe || 0,
+        eliteDriversSemestral: snapshot.eliteDriversSemestral || 0,
+        fidelidadePassageirosAnual: snapshot.fidelidadePassageirosAnual || 0,
+        reservaOperacionalGMV: snapshot.reservaOperacionalGMV || 0,
+        mktMensalOff: snapshot.mktMensalOff || 0,
+        trafegoPago: snapshot.trafegoPago || 0,
       },
     }));
     // Zera apenas os itens de campanhas e fidelidade; mantém marketingMonthly, mktMensalOff, trafegoPago
@@ -228,6 +254,9 @@ const App: React.FC = () => {
     updateCurrentParam('eliteDriversSemestral', backup?.eliteDriversSemestral || 0);
     updateCurrentParam('fidelidadePassageirosAnual', backup?.fidelidadePassageirosAnual || 0);
     updateCurrentParam('reservaOperacionalGMV', backup?.reservaOperacionalGMV || 0);
+    // Restaura exatamente os não afetados caso tenham sido alterados por efeitos colaterais
+    updateCurrentParam('mktMensalOff', backup?.mktMensalOff || (currentParams.mktMensalOff || 0));
+    updateCurrentParam('trafegoPago', backup?.trafegoPago || (currentParams.trafegoPago || 0));
     setCampaignsSuspendedMap(prev => ({ ...prev, [scenario]: false }));
   };
 
@@ -775,6 +804,7 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={restoreCampaigns}
+                  data-testid="restore-campaigns"
                   className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
                 >
                   Reativar Campanhas
@@ -783,6 +813,7 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={suspendCampaigns}
+                  data-testid="suspend-campaigns"
                   className="px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-all"
                 >
                   Suspender Campanhas
@@ -817,6 +848,7 @@ const App: React.FC = () => {
                         step={s.step}
                         value={(currentParams as any)[s.paramKey]}
                         onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
+                        data-testid={`slider-${String(s.paramKey)}`}
                         className="w-full accent-yellow-500"
                       />
                     </div>
@@ -836,6 +868,7 @@ const App: React.FC = () => {
                         step={s.step}
                         value={(currentParams as any)[s.paramKey]}
                         onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
+                        data-testid={`slider-${String(s.paramKey)}`}
                         className={`w-full accent-yellow-500 ${campaignsSuspended && (s.paramKey === 'adesaoTurbo' || s.paramKey === 'parceriasBares' || s.paramKey === 'indiqueGanhe') ? 'opacity-40 cursor-not-allowed' : ''}`}
                         disabled={campaignsSuspended && (s.paramKey === 'adesaoTurbo' || s.paramKey === 'parceriasBares' || s.paramKey === 'indiqueGanhe')}
                       />
@@ -882,6 +915,7 @@ const App: React.FC = () => {
                   step={s.step}
                   value={(currentParams as any)[s.paramKey]}
                   onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
+                  data-testid={`slider-${String(s.paramKey)}`}
                   className={`w-full accent-orange-500 ${campaignsSuspended ? 'opacity-40 cursor-not-allowed' : ''}`}
                   disabled={campaignsSuspended}
                 />
