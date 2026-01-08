@@ -2,7 +2,7 @@ name: Auto-merge PRs (squash)
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
 
 permissions:
   contents: write
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   enable-auto-merge:
-    if: github.event.pull_request.head.ref != '' && startsWith(github.event.pull_request.head.ref, 'feat/')
+    if: github.event.pull_request.head.ref != '' && startsWith(github.event.pull_request.head.ref, 'feat/') && contains(github.event.pull_request.labels.*.name, 'automerge') && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
