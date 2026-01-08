@@ -6,7 +6,8 @@
 
 [![Deploy](https://github.com/Lucios1000/Lucios1000-novos-apps/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/Lucios1000/Lucios1000-novos-apps/actions/workflows/deploy.yml)
 
-- Demo (GitHub Pages): https://lucios1000.github.io/Lucios1000-novos-apps/
+- Live Demo: https://lucios1000.github.io/Lucios1000-novos-apps/
+- Instalação PWA: abra a demo no Chrome/Edge → “Instalar app”
 
 # Run and deploy your AI Studio app
 

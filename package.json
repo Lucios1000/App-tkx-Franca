@@ -23,6 +23,7 @@
     "@playwright/test": "^1.35.0",
     "@types/node": "^20.12.7",
     "@vitejs/plugin-react": "^5.0.0",
+    "vite-plugin-pwa": "^0.20.5",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

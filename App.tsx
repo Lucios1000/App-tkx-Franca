@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import Layout from './components/Layout';
 import SnapshotModal from './components/SnapshotModal';
 import ComparisonTab from './components/ComparisonTab';
@@ -278,9 +277,10 @@ const App: React.FC = () => {
   };
 
   // Função para exportar em Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     try {
       console.log('Iniciando exportação Excel...', { projectionsLength: projections.length });
+      const XLSX = await import('xlsx');
       
       const wb = XLSX.utils.book_new();
       
