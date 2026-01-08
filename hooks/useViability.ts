@@ -69,7 +69,40 @@ export const useViability = () => {
     } 
   };
 
-  const [paramsMap, setParamsMap] = useState<Record<ScenarioType, SimulationParams>>(DEFAULT_VALUES);
+  const [paramsMap, setParamsMap] = useState<Record<ScenarioType, SimulationParams>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<ScenarioType, SimulationParams>;
+        return {
+          [ScenarioType.REALISTA]: { ...INITIAL_PARAMS, ...parsed[ScenarioType.REALISTA] },
+          [ScenarioType.PESSIMISTA]: { ...INITIAL_PARAMS, ...parsed[ScenarioType.PESSIMISTA] },
+          [ScenarioType.OTIMISTA]: { ...INITIAL_PARAMS, ...parsed[ScenarioType.OTIMISTA] },
+        };
+      }
+    } catch {}
+    return {
+      [ScenarioType.REALISTA]: { ...DEFAULT_VALUES[ScenarioType.REALISTA] },
+      [ScenarioType.PESSIMISTA]: { ...DEFAULT_VALUES[ScenarioType.PESSIMISTA] },
+      [ScenarioType.OTIMISTA]: { ...DEFAULT_VALUES[ScenarioType.OTIMISTA] },
+    };
+  });
+
+  // Migração/normalização: garante que cada cenário tenha objeto independente (sem referências compartilhadas)
+  useEffect(() => {
+    const r = paramsMap[ScenarioType.REALISTA];
+    const p = paramsMap[ScenarioType.PESSIMISTA];
+    const o = paramsMap[ScenarioType.OTIMISTA];
+    if (r === p || r === o || p === o) {
+      setParamsMap(prev => ({
+        [ScenarioType.REALISTA]: { ...prev[ScenarioType.REALISTA] },
+        [ScenarioType.PESSIMISTA]: { ...prev[ScenarioType.PESSIMISTA] },
+        [ScenarioType.OTIMISTA]: { ...prev[ScenarioType.OTIMISTA] },
+      }));
+    }
+    // Executa apenas uma vez na montagem para quebrar referências antigas persistidas via HMR/estado
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Salva automaticamente no LocalStorage sempre que os parâmetros mudarem
   useEffect(() => {
@@ -82,6 +115,8 @@ export const useViability = () => {
   // Recalcula as projeções apenas quando os parâmetros mudam (Performance!)
   // Adaptação: Passamos o scenario também, pois o engine precisa dele para definir tetos de frota
   const projections = useMemo(() => calculateProjections(currentParams, scenario), [currentParams, scenario]);
+
+  // Removidos efeitos automáticos de ajuste do marketing com base em custos mínimos
   
   const audits = useMemo(() => auditYears(projections), [projections]);
 

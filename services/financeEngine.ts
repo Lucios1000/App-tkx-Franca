@@ -17,7 +17,8 @@ export const calculateProjections = (
   if (scenario === ScenarioType.OTIMISTA) driverCap = 3000;
 
   let currentDrivers = params.activeDrivers;
-  let currentUsers = params.activeDrivers > 0 ? params.activeDrivers * 50 : 100; 
+  // Base inicial de usuários começa em 0 para evitar números residuais ao zerar cenários
+  let currentUsers = 0; 
   let accumulatedProfit = -params.initialInvestment;
 
   // Crescimento em S por faixas de meses
@@ -50,6 +51,9 @@ export const calculateProjections = (
         marketing: 0,
         tech: 0, 
         campaignCosts: 0,
+        eliteDriversCost: 0,
+        fidelidadePassageirosCost: 0,
+        reservaOperacionalCost: 0,
         ebitda: 0,
         netProfit: 0,
         accumulatedProfit: -params.initialInvestment, // O investimento inicial permanece gasto
@@ -69,7 +73,12 @@ export const calculateProjections = (
     const stageGrowth = getStageGrowth(m + 1);
     const saturationFactor = Math.max(0, 1 - (currentUsers / MAX_USERS_SCENARIO));
     const effectiveGrowthRate = stageGrowth * saturationFactor;
-    currentUsers = Math.min(MAX_USERS_SCENARIO, currentUsers * (1 + effectiveGrowthRate));
+    // Com cenários totalmente zerados (sem frota ou sem uso), não crescer base de usuários
+    if (currentDrivers > 0 && (params.ridesPerUserMonth ?? 0) > 0) {
+      currentUsers = Math.min(MAX_USERS_SCENARIO, currentUsers * (1 + effectiveGrowthRate));
+    } else {
+      currentUsers = 0;
+    }
     
     const newUsersNet = currentUsers - previousUsers;
     const userChurnRate = (params.churnRate || 2) / 100;
@@ -86,7 +95,8 @@ export const calculateProjections = (
     const workingDaysPerMonth = 30.5; // dias úteis médios
     
     // Demanda de Usuários (com sazonalidade)
-    let demandedRides = currentUsers * (params.ridesPerUserMonth || 4.2);
+    const ridesPerUserMonth = params.ridesPerUserMonth ?? 4.2; // 0 é válido; só usa 4.2 se undefined/null
+    let demandedRides = currentUsers * ridesPerUserMonth;
 
     // Sazonalidade: -15% Jan/Jul, +20% Dez
     if (monthIndex === 0 || monthIndex === 6) { // Janeiro, Julho
@@ -133,13 +143,18 @@ export const calculateProjections = (
     // Impostos: 11,2% sobre Receita Bruta da TKX (takeRateGross)
     taxes = takeRateGross * 0.112;
 
-    // Marketing (CAC): base condicional (R$3.000) + 1,50 por NOVO usuário adicionado
-    // + investimento em campanhas específicas
+    // Marketing:
+    // - Marketing mensal controlado via slider
+    // - Campanhas específicas somadas
+    // - CAC variável desativado (controle direto pelo orçamento)
     const newUsersAdded = Math.max(0, currentUsers - previousUsers);
-    const marketingBase = params.applyMinimumCosts ? 3000 : 0;
+    const marketingBase = 0;
     const campaignSpend = (params.adesaoTurbo || 0) + (params.trafegoPago || 0) + 
-                          (params.parceriasBares || 0) + (params.indiqueGanhe || 0);
-    const totalMarketingInvestment = marketingBase + (1.5 * newUsersAdded) + campaignSpend;
+          (params.parceriasBares || 0) + (params.indiqueGanhe || 0) +
+          (params.mktMensalOff || 0);
+    const cacVariable = 0;
+    const marketingMonthlyComponent = (params.marketingMonthly || 0);
+    const totalMarketingInvestment = marketingBase + cacVariable + campaignSpend + marketingMonthlyComponent;
     totalMarketing = totalMarketingInvestment;
 
     // Tecnologia/APIs: 0,15 por corrida
@@ -149,16 +164,14 @@ export const calculateProjections = (
     const bankFees = (actualRides * 0.40) + (grossRevenue * 0.02);
     variableCosts = bankFees;
     
-    // Fixos escalonados: base condicional (R$8.000) e +50% a cada semestre
-    const semestersPassed = Math.floor(m / 6);
-    const fixedBase = params.applyMinimumCosts ? 8000 : 0;
-    const currentFixedCosts = fixedBase * Math.pow(1.5, semestersPassed);
+    // Fixos: controlados via slider + custo comercial/mkt
+    const currentFixedCosts = (params.fixedCosts || 0) + (params.custoComercialMkt || 0);
     
     // CUSTOS DE FIDELIDADE TKX DYNAMIC CONTROL
     // Elite Drivers: Semestral (meses 6, 12, 18, 24, 30, 36)
-    const eliteDriversCost = (m > 0 && (m + 1) % 6 === 0) ? params.eliteDriversSemestral : 0;
+    const eliteDriversCost = (m > 0 && (m + 1) % 6 === 0) ? (params.eliteDriversSemestral || 0) : 0;
     // Fidelidade Passageiros: Anual (meses 12, 24, 36)
-    const fidelidadePassageirosCost = (m > 0 && (m + 1) % 12 === 0) ? params.fidelidadePassageirosAnual : 0;
+    const fidelidadePassageirosCost = (m > 0 && (m + 1) % 12 === 0) ? (params.fidelidadePassageirosAnual || 0) : 0;
     
     // Calcula lucro preliminar (sem reserva operacional)
     const ebitdaPrelim = takeRateRevenue - taxes - variableCosts - currentFixedCosts - totalTech - totalMarketing - eliteDriversCost - fidelidadePassageirosCost;

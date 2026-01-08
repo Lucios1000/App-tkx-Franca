@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import Layout from './components/Layout';
 import SnapshotModal from './components/SnapshotModal';
@@ -102,6 +102,8 @@ const MKT_SLIDERS: Array<{
   max: number;
   step: number;
 }> = [
+  { label: 'Despesas Básicas', paramKey: 'fixedCosts', min: 0, max: 50000, step: 100 },
+  { label: 'Marketing (R$)', paramKey: 'marketingMonthly', min: 0, max: 50000, step: 100 },
   { label: 'Marketing Mídia OFF Mensal (R$)', paramKey: 'mktMensalOff', min: 0, max: 10000, step: 100 },
   { label: 'Adesão Turbo (R$)', paramKey: 'adesaoTurbo', min: 0, max: 10000, step: 100 },
   { label: 'Tráfego Pago (R$)', paramKey: 'trafegoPago', min: 0, max: 10000, step: 100 },
@@ -155,6 +157,80 @@ const App: React.FC = () => {
 
   const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
   const [yearPeriod, setYearPeriod] = useState<1 | 2 | 3>(1);
+  // Festas/Eventos
+  const [eventStartStr, setEventStartStr] = useState<string>('');
+  const [eventEndStr, setEventEndStr] = useState<string>('');
+  const [dynamicPct, setDynamicPct] = useState<number>(0);
+  const [ridesExtraPct, setRidesExtraPct] = useState<number>(0);
+  const [driversNeeded, setDriversNeeded] = useState<number>(0);
+  const [distributionMode, setDistributionMode] = useState<'constante' | 'curvaS'>('constante');
+  const [curveIntensity, setCurveIntensity] = useState<number>(0.45);
+  const [peakPosition, setPeakPosition] = useState<number>(0.5);
+
+  // Campanhas: suspensão/restauração com persistência por cenário
+  const [campaignsSuspendedMap, setCampaignsSuspendedMap] = useState<Record<ScenarioType, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('tkx_campaigns_suspended');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { [ScenarioType.REALISTA]: false, [ScenarioType.PESSIMISTA]: false, [ScenarioType.OTIMISTA]: false };
+  });
+  const [campaignsBackupMap, setCampaignsBackupMap] = useState<Record<ScenarioType, {
+    adesaoTurbo: number;
+    parceriasBares: number;
+    indiqueGanhe: number;
+    eliteDriversSemestral: number;
+    fidelidadePassageirosAnual: number;
+    reservaOperacionalGMV: number;
+  }>>(() => {
+    try {
+      const saved = localStorage.getItem('tkx_campaigns_backup');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      [ScenarioType.REALISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0 },
+      [ScenarioType.PESSIMISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0 },
+      [ScenarioType.OTIMISTA]: { adesaoTurbo: 0, parceriasBares: 0, indiqueGanhe: 0, eliteDriversSemestral: 0, fidelidadePassageirosAnual: 0, reservaOperacionalGMV: 0 },
+    };
+  });
+  const campaignsSuspended = campaignsSuspendedMap[scenario] || false;
+  useEffect(() => {
+    try { localStorage.setItem('tkx_campaigns_suspended', JSON.stringify(campaignsSuspendedMap)); } catch {}
+  }, [campaignsSuspendedMap]);
+  useEffect(() => {
+    try { localStorage.setItem('tkx_campaigns_backup', JSON.stringify(campaignsBackupMap)); } catch {}
+  }, [campaignsBackupMap]);
+  const suspendCampaigns = () => {
+    setCampaignsBackupMap(prev => ({
+      ...prev,
+      [scenario]: {
+        adesaoTurbo: currentParams.adesaoTurbo || 0,
+        parceriasBares: currentParams.parceriasBares || 0,
+        indiqueGanhe: currentParams.indiqueGanhe || 0,
+        eliteDriversSemestral: currentParams.eliteDriversSemestral || 0,
+        fidelidadePassageirosAnual: currentParams.fidelidadePassageirosAnual || 0,
+        reservaOperacionalGMV: currentParams.reservaOperacionalGMV || 0,
+      },
+    }));
+    // Zera apenas os itens de campanhas e fidelidade; mantém marketingMonthly, mktMensalOff, trafegoPago
+    updateCurrentParam('adesaoTurbo', 0);
+    updateCurrentParam('parceriasBares', 0);
+    updateCurrentParam('indiqueGanhe', 0);
+    updateCurrentParam('eliteDriversSemestral', 0);
+    updateCurrentParam('fidelidadePassageirosAnual', 0);
+    updateCurrentParam('reservaOperacionalGMV', 0);
+    setCampaignsSuspendedMap(prev => ({ ...prev, [scenario]: true }));
+  };
+  const restoreCampaigns = () => {
+    const backup = campaignsBackupMap[scenario];
+    updateCurrentParam('adesaoTurbo', backup?.adesaoTurbo || 0);
+    updateCurrentParam('parceriasBares', backup?.parceriasBares || 0);
+    updateCurrentParam('indiqueGanhe', backup?.indiqueGanhe || 0);
+    updateCurrentParam('eliteDriversSemestral', backup?.eliteDriversSemestral || 0);
+    updateCurrentParam('fidelidadePassageirosAnual', backup?.fidelidadePassageirosAnual || 0);
+    updateCurrentParam('reservaOperacionalGMV', backup?.reservaOperacionalGMV || 0);
+    setCampaignsSuspendedMap(prev => ({ ...prev, [scenario]: false }));
+  };
 
   const currentMonth = projections[0];
   const lastMonth = projections[projections.length - 1];
@@ -287,6 +363,76 @@ const App: React.FC = () => {
       }));
       const paramsSheet = XLSX.utils.json_to_sheet(paramsData);
       XLSX.utils.book_append_sheet(wb, paramsSheet, 'Parâmetros');
+
+      // Aba 5: Festas/Eventos (se válido)
+      try {
+        const validDates = eventStartStr && eventEndStr && new Date(eventEndStr) >= new Date(eventStartStr);
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const days = validDates ? (Math.floor((new Date(eventEndStr).getTime() - new Date(eventStartStr).getTime()) / msPerDay) + 1) : 0;
+        const baseMonthlyRides = projections[0]?.rides || 0;
+        const baseDailyRides = baseMonthlyRides / 30;
+        const baseEventRides = Math.max(0, Math.round(baseDailyRides * days));
+        const totalEventRides = Math.max(0, Math.round(baseEventRides * (1 + (ridesExtraPct || 0) / 100)));
+        const avgFareBase = currentParams.avgFare || 0;
+        const avgFareAdj = avgFareBase * (1 + (dynamicPct || 0) / 100);
+        const gmvEvent = totalEventRides * avgFareAdj;
+        const takeRate = (currentParams as any).takeRate ?? 0.15;
+        const plataformaReceita = gmvEvent * takeRate;
+        const MPD = 10.1;
+        const driversCapacity = Math.floor((driversNeeded || 0) * MPD * Math.max(1, days));
+        const coberturaPct = totalEventRides > 0 ? Math.min(100, (driversCapacity / totalEventRides) * 100) : 0;
+        const corridasDiaNecessarias = days > 0 ? Math.ceil(totalEventRides / days) : 0;
+        const corridasPorDriverDia = (driversNeeded || 0) > 0 && days > 0 ? (totalEventRides / days) / driversNeeded : 0;
+        const dailyCapacity = (driversNeeded || 0) * MPD;
+        const perDayRidesConst = corridasDiaNecessarias;
+        const sCurveWeights = (n: number) => {
+          if (n <= 0) return [] as number[];
+          const mid = (n - 1) * peakPosition;
+          const k = curveIntensity;
+          const raw = Array.from({ length: n }, (_, i) => {
+            const s = 1 / (1 + Math.exp(-k * (i - mid)));
+            return s * (1 - s);
+          });
+          const sum = raw.reduce((a, b) => a + b, 0) || 1;
+          return raw.map(v => v / sum);
+        };
+        const weights = distributionMode === 'curvaS' ? sCurveWeights(days) : [];
+        const eventDailyData = Array.from({ length: days }, (_, i) => ({
+          Dia: i + 1,
+          'Corridas/dia': distributionMode === 'curvaS' ? Math.round(totalEventRides * (weights[i] || 0)) : perDayRidesConst,
+          'Capacidade/dia': dailyCapacity
+        }));
+        const peakIdx = eventDailyData.reduce((maxI, d, i) => (d['Corridas/dia'] > (eventDailyData[maxI]?.['Corridas/dia'] || 0) ? i : maxI), 0);
+        const peakDay = eventDailyData[peakIdx]?.Dia || 1;
+
+        const eventosResumo = [{
+          'Início': eventStartStr || '—',
+          'Fim': eventEndStr || '—',
+          'Dias': days,
+          'Corridas estimadas': totalEventRides,
+          'Tarifa média dinâmica': avgFareAdj,
+          'GMV evento': gmvEvent,
+          'Receita plataforma': plataformaReceita,
+          'Corridas/dia necessárias': corridasDiaNecessarias,
+          'Corridas por driver/dia': Math.ceil(corridasPorDriverDia),
+          'Capacidade total (corridas)': driversCapacity,
+          'Cobertura (%)': coberturaPct,
+          'Drivers informados': driversNeeded || 0,
+          'Distribuição': distributionMode,
+          'Intensidade (k)': curveIntensity,
+          'Pico (Dia)': peakDay,
+        }];
+
+        const eventosResumoSheet = XLSX.utils.json_to_sheet(eventosResumo);
+        XLSX.utils.book_append_sheet(wb, eventosResumoSheet, 'Eventos');
+
+        if (validDates && days > 0) {
+          const eventosDiarioSheet = XLSX.utils.json_to_sheet(eventDailyData);
+          XLSX.utils.book_append_sheet(wb, eventosDiarioSheet, 'Eventos_Diário');
+        }
+      } catch (e) {
+        console.warn('Falha ao gerar abas de Eventos:', e);
+      }
       
       // Salvar arquivo
       const fileName = `TKX-Dashboard-${scenario}-${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -379,20 +525,6 @@ const App: React.FC = () => {
   const renderParams = () => (
     <div className="space-y-6">
       <h3 className="text-sm font-black uppercase text-yellow-500">Parâmetros principais</h3>
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl mb-4">
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={currentParams.applyMinimumCosts}
-            onChange={(e) => updateCurrentParam('applyMinimumCosts', e.target.checked)}
-            className="w-5 h-5 accent-yellow-500"
-          />
-          <div>
-            <div className="text-sm font-bold text-white">Aplicar Custos Mínimos</div>
-            <div className="text-xs text-slate-400">Custos fixos R$8k/mês (escalado) + Marketing base R$3k/mês. Desmarque para cenário zero-cost.</div>
-          </div>
-        </label>
-      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {PARAM_SLIDERS.map((p) => (
           <div key={p.key} className="space-y-2">
@@ -632,49 +764,91 @@ const App: React.FC = () => {
       <div className="space-y-6">
         <div className="space-y-6">
           <h3 className="text-sm font-black uppercase text-yellow-500">Sliders de Marketing</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {MKT_SLIDERS && MKT_SLIDERS.map((s) => (
-              <div key={s.paramKey} className="space-y-2">
-                <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
-                  <span>{s.label}</span>
-                  <span className="text-yellow-400 text-sm">{formatCurrency((currentParams as any)[s.paramKey])}</span>
-                </div>
-                <input
-                  type="range"
-                  min={s.min}
-                  max={s.max}
-                  step={s.step}
-                  value={(currentParams as any)[s.paramKey]}
-                  onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
-                  className="w-full accent-yellow-500"
-                />
+          {/* Controle de Campanhas */}
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl mb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[10px] uppercase text-slate-400 font-black">Campanhas (Adesão, Parcerias, Indique/Ganhe)</div>
+                <div className="text-xs text-slate-500">Suspender campanhas não afeta Mídia OFF nem Tráfego Pago.</div>
               </div>
-            ))}
+              {campaignsSuspended ? (
+                <button
+                  type="button"
+                  onClick={restoreCampaigns}
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
+                >
+                  Reativar Campanhas
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={suspendCampaigns}
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-all"
+                >
+                  Suspender Campanhas
+                </button>
+              )}
+            </div>
+            {campaignsSuspended && (
+              <div className="mt-3 bg-red-900/40 border border-red-700/60 p-3 rounded text-red-200 text-xs">
+                ⚠️ Campanhas suspensas neste cenário. Sliders desabilitados: <strong>Adesão Turbo</strong>, <strong>Parcerias</strong>, <strong>Indique/Ganhe</strong>,
+                <strong> Elite Drivers</strong>, <strong> Fidelidade Passageiros</strong> e <strong> Reserva Operacional</strong>. 
+                Mantidos ativos: <strong>Mídia OFF</strong> e <strong>Tráfego Pago</strong>.
+              </div>
+            )}
           </div>
+          {(() => {
+            const primaryKeys = new Set<string>(['fixedCosts','marketingMonthly']);
+            const primary = (MKT_SLIDERS || []).filter(s => primaryKeys.has(String(s.paramKey)));
+            const rest = (MKT_SLIDERS || []).filter(s => !primaryKeys.has(String(s.paramKey)));
+            return (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  {primary.map((s) => (
+                    <div key={s.paramKey} className="space-y-2">
+                      <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
+                        <span>{s.label}</span>
+                        <span className="text-yellow-400 text-sm">{formatCurrency((currentParams as any)[s.paramKey])}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={s.min}
+                        max={s.max}
+                        step={s.step}
+                        value={(currentParams as any)[s.paramKey]}
+                        onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
+                        className="w-full accent-yellow-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {rest.map((s) => (
+                    <div key={s.paramKey} className="space-y-2">
+                      <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
+                        <span>{s.label}</span>
+                        <span className="text-yellow-400 text-sm">{formatCurrency((currentParams as any)[s.paramKey])}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={s.min}
+                        max={s.max}
+                        step={s.step}
+                        value={(currentParams as any)[s.paramKey]}
+                        onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
+                        className={`w-full accent-yellow-500 ${campaignsSuspended && (s.paramKey === 'adesaoTurbo' || s.paramKey === 'parceriasBares' || s.paramKey === 'indiqueGanhe') ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        disabled={campaignsSuspended && (s.paramKey === 'adesaoTurbo' || s.paramKey === 'parceriasBares' || s.paramKey === 'indiqueGanhe')}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+          
         </div>
         
-        {/* Botão Custos Mínimos */}
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-black uppercase text-amber-400">Custos Mínimos</h3>
-            <button
-              type="button"
-              onClick={toggleMinCosts}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                currentParams.minCostsEnabled
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
-            >
-              {currentParams.minCostsEnabled ? '✓ Ativo' : '✗ Desativado'}
-            </button>
-          </div>
-          {!currentParams.minCostsEnabled && (
-            <div className="bg-red-900 border border-red-500 p-3 rounded text-red-200 text-xs">
-              ⚠️ Alerta: Custos Mínimos estão desativados. Alguns custos fixos podem não ser aplicados.
-            </div>
-          )}
-        </div>
+        {/* Card de Custos Mínimos removido conforme solicitação */}
         
         {/* TKX DYNAMIC CONTROL: Sliders de Fidelidade */}
         <div className="space-y-6">
@@ -708,7 +882,8 @@ const App: React.FC = () => {
                   step={s.step}
                   value={(currentParams as any)[s.paramKey]}
                   onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
-                  className="w-full accent-orange-500"
+                  className={`w-full accent-orange-500 ${campaignsSuspended ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  disabled={campaignsSuspended}
                 />
                 <div className="text-[9px] text-slate-500">{s.description}</div>
               </div>
@@ -764,6 +939,227 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  const renderFestasEventos = () => {
+    const validDates = eventStartStr && eventEndStr && new Date(eventEndStr) >= new Date(eventStartStr);
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const days = validDates ? (Math.floor((new Date(eventEndStr).getTime() - new Date(eventStartStr).getTime()) / msPerDay) + 1) : 0;
+    const baseMonthlyRides = projections[0]?.rides || 0;
+    const baseDailyRides = baseMonthlyRides / 30;
+    const baseEventRides = Math.max(0, Math.round(baseDailyRides * days));
+    const totalEventRides = Math.max(0, Math.round(baseEventRides * (1 + (ridesExtraPct || 0) / 100)));
+    const avgFareBase = currentParams.avgFare || 0;
+    const avgFareAdj = avgFareBase * (1 + (dynamicPct || 0) / 100);
+    const gmvEvent = totalEventRides * avgFareAdj;
+    const takeRate = (currentParams as any).takeRate ?? 0.15;
+    const plataformaReceita = gmvEvent * takeRate;
+    const extraProfitPerRidePct = avgFareBase > 0 ? ((avgFareAdj - avgFareBase) / avgFareBase) * 100 : 0;
+    const MPD = 10.1;
+    const driversCapacity = Math.floor((driversNeeded || 0) * MPD * Math.max(1, days));
+    const coberturaPct = totalEventRides > 0 ? Math.min(100, (driversCapacity / totalEventRides) * 100) : 0;
+    const driversSugeridos = days > 0 ? Math.ceil((totalEventRides / (MPD * days)) || 0) : 0;
+    const corridasDiaNecessarias = days > 0 ? Math.ceil(totalEventRides / days) : 0;
+    const corridasPorDriverDia = (driversNeeded || 0) > 0 && days > 0 ? (totalEventRides / days) / driversNeeded : 0;
+    const dailyCapacity = (driversNeeded || 0) * MPD;
+    const perDayRidesConst = corridasDiaNecessarias;
+    const sCurveWeights = (n: number) => {
+      if (n <= 0) return [] as number[];
+      const mid = (n - 1) * peakPosition; // controla onde ocorre o pico
+      const k = curveIntensity; // controla quão acentuado é o pico
+      const raw = Array.from({ length: n }, (_, i) => {
+        const s = 1 / (1 + Math.exp(-k * (i - mid)));
+        return s * (1 - s); // derivada logística (s-curve bell)
+      });
+      const sum = raw.reduce((a, b) => a + b, 0) || 1;
+      return raw.map(v => v / sum);
+    };
+    const weights = distributionMode === 'curvaS' ? sCurveWeights(days) : [];
+    const eventDailyData = Array.from({ length: days }, (_, i) => ({
+      day: i + 1,
+      rides: distributionMode === 'curvaS' ? Math.round(totalEventRides * (weights[i] || 0)) : perDayRidesConst,
+      capacity: dailyCapacity,
+    }));
+    const peakIdx = eventDailyData.reduce((maxI, d, i) => (d.rides > (eventDailyData[maxI]?.rides || 0) ? i : maxI), 0);
+    const peakDay = eventDailyData[peakIdx]?.day || 1;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-black uppercase text-yellow-500">Projeções de Festas/Eventos</h3>
+          <span className="text-[10px] text-slate-400 px-2 py-1 rounded-full bg-slate-800 border border-slate-700">Selecione período e parâmetros</span>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Início do evento</div>
+              <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
+                value={eventStartStr} onChange={(e) => setEventStartStr(e.target.value)} />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Fim do evento</div>
+              <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
+                value={eventEndStr} onChange={(e) => setEventEndStr(e.target.value)} />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Dinâmica sobre tarifa (%)</div>
+              <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm" placeholder="ex.: 25"
+                value={dynamicPct} onChange={(e) => setDynamicPct(Number(e.target.value))} />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">% adicional de corridas</div>
+              <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm" placeholder="ex.: 40"
+                value={ridesExtraPct} onChange={(e) => setRidesExtraPct(Number(e.target.value))} />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Drivers necessários</div>
+              <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm" placeholder="ex.: 120"
+                value={driversNeeded} onChange={(e) => setDriversNeeded(Number(e.target.value))} />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Distribuição diária</div>
+              <select
+                className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
+                value={distributionMode}
+                onChange={(e) => setDistributionMode(e.target.value as 'constante' | 'curvaS')}
+              >
+                <option value="constante">Constante</option>
+                <option value="curvaS">Curva S</option>
+              </select>
+            </div>
+            {distributionMode === 'curvaS' && (
+              <div>
+                <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Intensidade da curva (k)</div>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={1.2}
+                  step={0.05}
+                  value={curveIntensity}
+                  onChange={(e) => setCurveIntensity(Number(e.target.value))}
+                  className="w-full accent-yellow-500"
+                />
+                <div className="text-[11px] text-slate-500 mt-1">Picos mais acentuados com valores maiores ({curveIntensity.toFixed(2)}).</div>
+              </div>
+            )}
+            {distributionMode === 'curvaS' && (
+              <div>
+                <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Posição do pico</div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={peakPosition}
+                  onChange={(e) => setPeakPosition(Number(e.target.value))}
+                  className="w-full accent-yellow-500"
+                />
+                <div className="text-[11px] text-slate-500 mt-1">0 = início • 0,5 = meio • 1 = fim ({peakPosition.toFixed(2)}).</div>
+              </div>
+            )}
+          </div>
+          <div className="mt-3 text-[12px] text-slate-400">
+            {validDates ? (
+              <span>Período selecionado: <span className="text-yellow-400 font-bold">{days}</span> dia(s). Base diária estimada: <span className="text-yellow-400 font-bold">{Math.round(baseDailyRides)}</span> corridas/dia.</span>
+            ) : (
+              <span className="text-red-400">Selecione datas válidas para calcular as projeções.</span>
+            )}
+          </div>
+        </div>
+
+        {validDates && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Corridas estimadas no período</div>
+              <div className="text-2xl font-black text-white"><NumberDisplay value={totalEventRides} /></div>
+              <div className="text-[11px] text-slate-500">Base: {baseEventRides} • Adic.: {ridesExtraPct}%</div>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Tarifa média com dinâmica</div>
+              <div className="text-2xl font-black text-gradient-gold"><CurrencyDisplay value={avgFareAdj} /></div>
+              <div className="text-[11px] text-slate-500">Base: <CurrencyDisplay value={avgFareBase} /> • Dinâmica: {dynamicPct || 0}%</div>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">% lucro extra por corrida</div>
+              <div className="text-2xl font-black text-gradient-green"><PercentDisplay value={extraProfitPerRidePct} /></div>
+              <div className="text-[11px] text-slate-500">Considerando take rate de {(takeRate * 100).toFixed(0)}%</div>
+            </div>
+          </div>
+        )}
+
+        {validDates && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-2">Faturamento estimado do evento</div>
+              <div className="grid grid-cols-2 gap-4 text-slate-200">
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">GMV (corridas x tarifa)</div>
+                  <div className="text-xl font-black text-gradient-gold"><CurrencyDisplay value={gmvEvent} /></div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Receita plataforma (take rate)</div>
+                  <div className="text-xl font-black text-gradient-gold"><CurrencyDisplay value={plataformaReceita} /></div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Corridas/dia necessárias</div>
+                  <div className="text-xl font-black"><NumberDisplay value={corridasDiaNecessarias} /></div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Corridas por driver/dia</div>
+                  <div className="text-xl font-black"><NumberDisplay value={Math.ceil(corridasPorDriverDia)} /></div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+              <div className="text-[10px] uppercase text-slate-400 font-black mb-2">Capacidade de atendimento</div>
+              <div className="grid grid-cols-2 gap-4 text-slate-200">
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Drivers informados</div>
+                  <div className="text-xl font-black"><NumberDisplay value={driversNeeded || 0} /></div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Capacidade (corridas)</div>
+                  <div className="text-xl font-black"><NumberDisplay value={driversCapacity} /></div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Cobertura da demanda</div>
+                  <div className={`text-xl font-black ${coberturaPct >= 100 ? 'text-gradient-green' : 'text-yellow-300'}`}><PercentDisplay value={coberturaPct} /></div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Drivers sugeridos</div>
+                  <div className="text-xl font-black"><NumberDisplay value={driversSugeridos} /></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {validDates && (
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+            <div className="text-[10px] uppercase text-slate-400 font-black mb-2">Corridas/dia x Capacidade (período do evento)</div>
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={eventDailyData}>
+                <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="day" stroke="#475569" fontSize={10} label={{ value: 'Dia', position: 'insideBottomRight', offset: -4, fill: '#94a3b8' }} />
+                <YAxis stroke="#475569" fontSize={10} />
+                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'transparent', stroke: 'transparent' }} />
+                <Legend content={<NeutralLegend />} />
+                <ReferenceLine x={peakDay} stroke="#eab308" strokeDasharray="4 2" label={{ value: `Pico (Dia ${peakDay})`, position: 'top', fill: '#eab308', fontSize: 10 }} />
+                <defs>
+                  <linearGradient id="gradRidesEventos" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#fbbf24" />
+                    <stop offset="100%" stopColor="#f59e0b" />
+                  </linearGradient>
+                </defs>
+                <Bar dataKey="rides" name="Corridas/dia" fill="url(#gradRidesEventos)" radius={[8,8,2,2]} opacity={0.95} stroke="#0b1220" strokeWidth={2} />
+                <Line type="monotone" dataKey="capacity" name="Capacidade/dia" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3, fill: '#16a34a', stroke: '#0b1220', strokeWidth: 1 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
     );
   };
@@ -1211,7 +1607,7 @@ const App: React.FC = () => {
 
     return (
       <div className="space-y-6">
-        <h3 className="text-sm font-black uppercase text-yellow-500">Comparativo Semestral (limpo)</h3>
+        <h3 className="text-sm font-black uppercase text-yellow-500">Comparativo semestral (mesmo período até 36º Mês)</h3>
         <div className="space-y-4">
           {semestralComparisons.map((s) => {
             const june = s.blocoJunho;
@@ -2099,6 +2495,8 @@ const App: React.FC = () => {
         return <ComparisonTab snapshots={snapshots} calculateProjections={calculateProjections} />;
       case 14:
         return <TrendAnalysisTab snapshots={snapshots} calculateProjections={calculateProjections} />;
+      case 15:
+        return renderFestasEventos();
         return (
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl text-slate-200">
             <p className="text-sm font-medium">Conteúdo desta aba ainda não foi reescrito. Use as abas de visão geral para acompanhar os números principais.</p>
@@ -2122,7 +2520,7 @@ const App: React.FC = () => {
               <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 bg-clip-text text-transparent">TKX Franca Dashboard</h1>
               <p className="text-slate-400 text-xs mt-1 font-medium">Cenário: <span className="text-yellow-400 font-bold">{SCENARIO_LABEL[scenario]}</span></p>
           </div>
-          {renderScenarioSelector()}
+          {activeTab !== 15 && renderScenarioSelector()}
         </div>
 
         {(supplyBottleneck || oversupplyWarning) && (

@@ -76,3 +76,14 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Animação de piscar (alternado) */
+@keyframes blink-alt {
+  0% { opacity: 1; }
+  50% { opacity: 0.15; }
+  100% { opacity: 1; }
+}
+
+.blink-alt {
+  animation: blink-alt 1s ease-in-out infinite;
+}
+

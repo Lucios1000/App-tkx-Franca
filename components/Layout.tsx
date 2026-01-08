@@ -1,5 +1,5 @@
 
-import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone, Zap, Save } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone, Zap, Save, Trash2 } from 'lucide-react';
 import React from 'react';
 
 interface LayoutProps {
@@ -9,13 +9,15 @@ interface LayoutProps {
   onExportPDF?: () => void;
   onExportExcel?: () => void;
   onOpenSnapshots?: () => void;
+  onClearParams?: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onExportPDF, onExportExcel, onOpenSnapshots }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onExportPDF, onExportExcel, onOpenSnapshots, onClearParams }) => {
   const tabs = [
     { id: 0, label: 'CALOR / DEMANDA', icon: <MapIcon size={22} /> },
     { id: 1, label: 'BENCH / MARKET SHARE', icon: <Users size={22} /> },
     { id: 2, label: 'MKT/CF', icon: <Megaphone size={22} /> },
+    { id: 15, label: 'PROJEÇÕES DE FESTAS/EVENTOS', icon: <Zap size={22} /> },
     { id: 3, label: 'PARAMETRIZAÇÃO', icon: <Sliders size={22} /> },
     { id: 4, label: 'DRIVERS/ ESCALA', icon: <UserCheck size={22} /> },
     { id: 5, label: 'PROJEÇÕES/ ESCALA', icon: <TrendingUp size={22} /> },
@@ -77,6 +79,19 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onEx
               >
                 <Download size={16} />
               </button>
+              {onClearParams && (
+                <>
+                  <div className="w-px h-4 bg-slate-800 mx-1"></div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); onClearParams?.(); }}
+                    title="Limpar parâmetros salvos e recarregar"
+                    className="p-2 text-slate-400 hover:text-yellow-500 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </>
+              )}
             </div>
             <div className="bg-yellow-500 text-slate-950 px-3 py-1 rounded-md text-[10px] font-black uppercase shadow-[0_0_15px_rgba(234,179,8,0.4)]">
               {tabs.find(t => t.id === activeTab)?.label}
