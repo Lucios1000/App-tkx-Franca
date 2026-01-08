@@ -46,7 +46,7 @@ jobs:
           TAG_NAME="${GITHUB_REF##*/}"
           if [[ "$TAG_NAME" == *"pre-refactor-campanhas"* ]]; then
             NAME="Snapshot: Pré-mudanças (Campanhas) — ${TAG_NAME}"
-            BODY="Snapshot pré-mudanças das campanhas. Contém zips de código (source) e build (dist)."
+            BODY="Snapshot pré-mudanças das campanhas. Contém zips de código (source) e build (dist).\n\nLabel: Latest snapshot"
           else
             NAME="Snapshot: ${TAG_NAME}"
             BODY="Snapshot automático gerado pela tag ${TAG_NAME}. Contém zips de código (source) e build (dist)."
