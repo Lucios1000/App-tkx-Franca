@@ -344,12 +344,15 @@ const App: React.FC = () => {
         'Receita': r.takeRateRevenue || 0,
         'Impostos': r.taxes || 0,
         'Fixos': r.fixedCosts || 0,
-        'Marketing': r.totalMarketing || 0,
-        'Tech': r.totalTech || 0,
-        'Variáveis': r.variableCosts || 0,
+        'Marketing': r.marketing || 0,
+        'Gateway %': r.gatewayFees || 0,
+        'Seguro (R$/corrida)': r.insuranceCosts || 0,
+        'Manutenção (R$/corrida)': r.maintenanceCosts || 0,
+        'Provisão Legal (R$/corrida)': r.legalReserveCosts || 0,
+        'Variáveis (Total)': r.variableCosts || 0,
         'Elite Drivers': r.eliteDriversCost || 0,
         'Fid. Passageiros': r.fidelidadePassageirosCost || 0,
-        'Res. Oper.': r.reservaOperacional || 0,
+        'Res. Oper.': r.reservaOperacionalCost || 0,
         'Lucro/Prejuízo': r.netProfit || 0,
         'Margem %': r.margin || 0,
       }));
@@ -594,6 +597,74 @@ const App: React.FC = () => {
             />
           </div>
         ))}
+      </div>
+      <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-[10px] uppercase text-slate-400 font-black">Descontos (DRE)</h4>
+          <span className="text-[10px] text-slate-500">Ajuste gateway e custos por corrida</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
+              <span>Taxa de Gateway (%)</span>
+              <span className="text-yellow-400 text-sm">{(currentParams.gatewayFeeRatePct ?? 0).toFixed(1)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={5}
+              step={0.1}
+              value={currentParams.gatewayFeeRatePct ?? 0}
+              onChange={(e) => updateCurrentParam('gatewayFeeRatePct' as any, Number(e.target.value))}
+              className="w-full accent-yellow-500"
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
+              <span>Seguro por corrida (R$)</span>
+              <span className="text-yellow-400 text-sm">{(currentParams.insurancePerRide ?? 0).toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.05}
+              value={currentParams.insurancePerRide ?? 0}
+              onChange={(e) => updateCurrentParam('insurancePerRide' as any, Number(e.target.value))}
+              className="w-full accent-yellow-500"
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
+              <span>Manutenção por corrida (R$)</span>
+              <span className="text-yellow-400 text-sm">{(currentParams.maintenancePerRide ?? 0).toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.05}
+              value={currentParams.maintenancePerRide ?? 0}
+              onChange={(e) => updateCurrentParam('maintenancePerRide' as any, Number(e.target.value))}
+              className="w-full accent-yellow-500"
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
+              <span>Provisão Legal por corrida (R$)</span>
+              <span className="text-yellow-400 text-sm">{(currentParams.legalReservePerRide ?? 0).toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.05}
+              value={currentParams.legalReservePerRide ?? 0}
+              onChange={(e) => updateCurrentParam('legalReservePerRide' as any, Number(e.target.value))}
+              className="w-full accent-yellow-500"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1954,8 +2025,11 @@ const App: React.FC = () => {
               <th className="p-2 text-right">Impostos</th>
               <th className="p-2 text-right">Fixos</th>
               <th className="p-2 text-right">Marketing</th>
-              <th className="p-2 text-right">Tech</th>
-              <th className="p-2 text-right">Variáveis</th>
+              <th className="p-2 text-right">Gateway</th>
+              <th className="p-2 text-right">Seguro</th>
+              <th className="p-2 text-right">Manutenção</th>
+              <th className="p-2 text-right">Provisão</th>
+              <th className="p-2 text-right">Variáveis (Total)</th>
               <th className="p-2 text-right">Elite Drivers</th>
               <th className="p-2 text-right">Fid. Passag.</th>
               <th className="p-2 text-right">Res. Oper.</th>
@@ -1974,7 +2048,10 @@ const App: React.FC = () => {
                 <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.taxes} /></td>
                 <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.fixedCosts} /></td>
                 <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.marketing} /></td>
-                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.tech} /></td>
+                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.gatewayFees} /></td>
+                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.insuranceCosts} /></td>
+                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.maintenanceCosts} /></td>
+                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.legalReserveCosts} /></td>
                 <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.variableCosts} /></td>
                 <td className="p-2 text-right text-orange-300"><CurrencyDisplay value={row.eliteDriversCost} /></td>
                 <td className="p-2 text-right text-orange-300"><CurrencyDisplay value={row.fidelidadePassageirosCost} /></td>
@@ -1999,7 +2076,7 @@ const App: React.FC = () => {
           <div><span className="font-semibold text-slate-400 text-[10px]">🥉 Ouro 450+ corridas/mês (58,7% vol): 10% | 🥈 Prata 300-449: 12% | 🥉 Bronze 0-299 (41,3% vol): 15%</span></div>
           <div><span className="font-semibold text-slate-200">Fixos:</span> R$8k escalado (+50%/semestre)</div>
           <div><span className="font-semibold text-slate-200">Marketing:</span> R$3k + R$1,5/novo usuário</div>
-          <div><span className="font-semibold text-slate-200">Tech:</span> R$0,15/corrida + Bancário (2% GMV)</div>
+          <div><span className="font-semibold text-slate-200">Variáveis:</span> Gateway 2,5% GMV; Seguro R$0,60; Manutenção R$0,40; Provisão Legal R$0,35</div>
           <div><span className="font-semibold text-orange-400">Elite Drivers:</span> Premiação semestral (M6, M12, M18...)</div>
           <div><span className="font-semibold text-orange-400">Fid. Passageiros:</span> Sorteio anual (M12, M24, M36)</div>
           <div><span className="font-semibold text-orange-400">Reserva Operacional:</span> % Lucro Líquido (gatilhos/experiências)</div>

@@ -156,20 +156,20 @@ const StrategicInputsTab: React.FC<Props> = ({ scenario, currentParams, updateCu
   }, [currentParams.samPopulation, currentParams.marketShareTarget]);
 
   // — Simulador Técnico (independente dos sliders) —
-  // Parâmetros fixos definidos pela regra
-  const BASE_FARE = 11.5; // Tarifa Base fixa (R$)
-  const KM_RATE = 2.0;    // Valor por KM fixo (R$/km)
+  // Parâmetros editáveis conforme solicitação
+  const [baseFare, setBaseFare] = useState<number>(11.5); // Tarifa Base (R$)
+  const [kmRate, setKmRate] = useState<number>(2.0);      // Valor por KM (R$/km)
 
-  const [minFare, setMinFare] = useState<number>(1.0); // Tarifa Mínima (R$)
-  const [hourMultiplier, setHourMultiplier] = useState<number>(1.0); // Multiplicador Horário (1.0 a 1.3)
-  const [simKm, setSimKm] = useState<number>(3);
-  const [simMinutes, setSimMinutes] = useState<number>(10); // Informativo (sem efeito financeiro)
-  const [dynamicPct, setDynamicPct] = useState<number>(0);
+  const [minFare, setMinFare] = useState<number>(1.0); // Tarifa Mínima (slider 1.0 a 5.0)
+  const [hourMultiplier, setHourMultiplier] = useState<number>(1.0); // Multiplicador Horário
+  const [simKm, setSimKm] = useState<number>(2.5);
+  const [simMinutes, setSimMinutes] = useState<number>(0); // Informativo (sem efeito financeiro)
+  const [dynamicPct, setDynamicPct] = useState<number>(10);
 
   const technicalTicket = useMemo(() => {
     const baseFormula = (minFare || 0) * (hourMultiplier || 1)
-      + BASE_FARE
-      + (KM_RATE * (simKm || 0));
+      + (baseFare || 0)
+      + ((kmRate || 0) * (simKm || 0));
     const factor = 1 + ((dynamicPct || 0) / 100);
     return Math.max(0, baseFormula * factor);
   }, [minFare, hourMultiplier, simKm, dynamicPct]);
@@ -313,11 +313,16 @@ const StrategicInputsTab: React.FC<Props> = ({ scenario, currentParams, updateCu
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <div className="text-[10px] uppercase text-slate-400 font-bold">Tarifa Mínima (R$)</div>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] uppercase text-slate-400 font-bold">Tarifa Mínima (R$)</div>
+              <span className="text-[10px] text-slate-400">{minFare.toFixed(2)}</span>
+            </div>
             <input
-              type="number"
+              type="range"
+              min={1}
+              max={5}
               step={0.1}
-              className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
+              className="w-full accent-yellow-500"
               value={minFare}
               onChange={(e) => setMinFare(Number(e.target.value))}
               data-testid="sim-min-fare"
@@ -330,21 +335,32 @@ const StrategicInputsTab: React.FC<Props> = ({ scenario, currentParams, updateCu
               onChange={(e) => setHourMultiplier(Number(e.target.value))}
               data-testid="sim-hour-multiplier"
             >
-              {[1.0, 1.1, 1.2, 1.3].map(v => (
-                <option key={v} value={v}>{v.toFixed(1)}x</option>
-              ))}
+              <option value={1.0}>Tabela 0 - 08:00 e 20:59 (0%)</option>
+              <option value={1.1}>Tabela 1 - 22:01 e 23:00 (10%)</option>
+              <option value={1.2}>Tabela 2 - 23:01 e 05:59 (20%)</option>
+              <option value={1.3}>Tabela 3 - 06:00 e 07:59 (30%)</option>
             </select>
           </div>
 
           <div className="space-y-2">
-            <div className="text-[10px] uppercase text-slate-400 font-bold">Tarifa Base (fixa)</div>
-            <div className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm text-slate-200" aria-readonly>
-              {formatCurrency(BASE_FARE)}
-            </div>
-            <div className="text-[10px] uppercase text-slate-400 font-bold mt-3">Valor por KM (fixo)</div>
-            <div className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm text-slate-200" aria-readonly>
-              {formatCurrency(KM_RATE)} / km
-            </div>
+            <div className="text-[10px] uppercase text-slate-400 font-bold">Tarifa Base</div>
+            <input
+              type="number"
+              step={0.1}
+              className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
+              value={baseFare}
+              onChange={(e) => setBaseFare(Number(e.target.value))}
+              data-testid="sim-base-fare"
+            />
+            <div className="text-[10px] uppercase text-slate-400 font-bold mt-3">Valor por KM</div>
+            <input
+              type="number"
+              step={0.05}
+              className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
+              value={kmRate}
+              onChange={(e) => setKmRate(Number(e.target.value))}
+              data-testid="sim-km-rate"
+            />
           </div>
 
           <div className="space-y-2">
@@ -374,7 +390,7 @@ const StrategicInputsTab: React.FC<Props> = ({ scenario, currentParams, updateCu
               className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
               value={dynamicPct}
               onChange={(e) => setDynamicPct(Number(e.target.value))}
-              placeholder="Ex.: 25 (para 25%)"
+              placeholder="Ex.: 10"
               data-testid="sim-dynamic-pct"
             />
           </div>

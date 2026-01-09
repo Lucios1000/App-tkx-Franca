@@ -21,6 +21,12 @@ export interface SimulationParams {
   cancellationRate: number;
   driverGrowth: number;
   
+  // Descontos/Taxas DRE (parametrização)
+  gatewayFeeRatePct: number; // % sobre GMV (ex.: 2.5)
+  insurancePerRide: number;  // R$ por corrida (ex.: 0.60)
+  maintenancePerRide: number; // R$ por corrida (ex.: 0.40)
+  legalReservePerRide: number; // R$ por corrida (ex.: 0.35)
+  
   // Marketing Campaigns
   adesaoTurbo: number;
   trafegoPago: number;
@@ -66,7 +72,12 @@ export interface MonthlyResult {
   cashback: number; // Diferença devolvida ao motorista
   takeRateRevenue: number; // Receita líquida TKX
   taxes: number;
-  variableCosts: number;
+  // Custos variáveis detalhados
+  gatewayFees: number; // % sobre GMV (gateway)
+  insuranceCosts: number; // R$ por corrida (seguro APP)
+  maintenanceCosts: number; // R$ por corrida (manutenção operações)
+  legalReserveCosts: number; // R$ por corrida (provisão legal)
+  variableCosts: number; // Soma dos custos variáveis acima
   fixedCosts: number;
   marketing: number;
   tech: number;

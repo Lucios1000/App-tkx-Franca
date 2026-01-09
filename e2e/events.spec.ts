@@ -9,6 +9,8 @@ import { test, expect } from '@playwright/test';
 
 test('Eventos: Curva S, KPIs e exportação Excel', async ({ page, context }) => {
   await page.goto('/');
+  // Mitiga diálogos JS (alert/confirm) disparados pela exportação
+  await page.addInitScript(() => { (window as any).alert = () => {}; (window as any).confirm = () => true; });
 
   // Ir para a aba de eventos
   await page.getByRole('button', { name: 'PROJEÇÕES DE FESTAS/EVENTOS' }).click();

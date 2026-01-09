@@ -34,6 +34,12 @@ export const INITIAL_PARAMS: SimulationParams = {
   cancellationRate: 3,
   driverGrowth: 5,
   
+  // Descontos/Taxas DRE (defaults)
+  gatewayFeeRatePct: 2.5,
+  insurancePerRide: 0.60,
+  maintenancePerRide: 0.40,
+  legalReservePerRide: 0.35,
+  
   // Campaigns
   adesaoTurbo: 3000,
   trafegoPago: 4000,

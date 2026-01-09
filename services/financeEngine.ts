@@ -54,6 +54,10 @@ export const calculateProjections = (
         cashback: 0,
         takeRateRevenue: 0,
         taxes: 0,
+        gatewayFees: 0,
+        insuranceCosts: 0,
+        maintenanceCosts: 0,
+        legalReserveCosts: 0,
         variableCosts: 0, 
         fixedCosts: 0,
         marketing: 0,
@@ -143,6 +147,10 @@ export const calculateProjections = (
 
     // CONDIÇÃO: Se Volume de Corridas for 0, zerar impostos, taxas e marketing
     let taxes = 0;
+    let gatewayFees = 0;
+    let insuranceCosts = 0;
+    let maintenanceCosts = 0;
+    let legalReserveCosts = 0;
     let variableCosts = 0;
     let totalMarketing = 0;
     const campaignCosts = 0; // não considerado no novo modelo
@@ -168,9 +176,13 @@ export const calculateProjections = (
     // Tecnologia/APIs: 0,15 por corrida
     totalTech = actualRides * 0.15;
 
-    // Bancário/Gateway: 0,40 por corrida + 2% sobre GMV
-    const bankFees = (actualRides * 0.40) + (grossRevenue * 0.02);
-    variableCosts = bankFees;
+    // Custos variáveis detalhados conforme parametrização
+    const gatewayRate = (params.gatewayFeeRatePct ?? 2.5) / 100;
+    gatewayFees = grossRevenue * gatewayRate;
+    insuranceCosts = actualRides * (params.insurancePerRide ?? 0.6);
+    maintenanceCosts = actualRides * (params.maintenancePerRide ?? 0.4);
+    legalReserveCosts = actualRides * (params.legalReservePerRide ?? 0.35);
+    variableCosts = gatewayFees + insuranceCosts + maintenanceCosts + legalReserveCosts;
     
     // Fixos: controlados via slider + custo comercial/mkt
     const currentFixedCosts = (params.fixedCosts || 0) + (params.custoComercialMkt || 0);
@@ -221,6 +233,10 @@ export const calculateProjections = (
       cashback,
       takeRateRevenue,
       taxes,
+      gatewayFees,
+      insuranceCosts,
+      maintenanceCosts,
+      legalReserveCosts,
       variableCosts, 
       fixedCosts: currentFixedCosts,
       marketing: totalMarketing,
