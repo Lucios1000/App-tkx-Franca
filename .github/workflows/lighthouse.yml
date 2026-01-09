@@ -1,19 +1,27 @@
-name: Lighthouse (Pages)
+name: Lighthouse CI
 
 on:
-  schedule:
-    - cron: '0 3 * * *'  # diário às 03:00 UTC
-  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [ main ]
 
 jobs:
   lhci:
     runs-on: ubuntu-latest
     steps:
-      - name: Audit Production URL
-        uses: treosh/lighthouse-ci-action@v10
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          urls: |
-            https://lucios1000.github.io/Lucios1000-novos-apps/
-          configPath: 'lighthouserc.json'
-          uploadArtifacts: true
-          temporaryPublicStorage: true
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run Lighthouse CI
+        run: npx lhci autorun --config=.lighthouserc.json
