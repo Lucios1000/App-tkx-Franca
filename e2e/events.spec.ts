@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 // - Disparar exportação Excel e verificar início do download
 
 test('Eventos: Curva S, KPIs e exportação Excel', async ({ page, context }) => {
-  await page.goto('/');
+  await page.goto('./');
   // Mitiga diálogos JS (alert/confirm) disparados pela exportação
   await page.addInitScript(() => { (window as any).alert = () => {}; (window as any).confirm = () => true; });
 

@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 // - Restaura campanhas e valida recuperação dos valores anteriores
 
 test('Campanhas: suspender/restaurar e persistência por cenário', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
 
   // Ir para a aba Marketing/CF
   await page.getByRole('button', { name: 'MKT/CF' }).click();

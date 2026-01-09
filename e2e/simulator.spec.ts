@@ -28,7 +28,7 @@ async function setNumberInput(page, testId: string, value: string | number) {
 }
 
 test('Simulador Técnico: controles e cálculo do ticket', async ({ page }) => {
-  await page.goto('/#tab=16');
+  await page.goto('./#tab=16');
 
   // Controles presentes
   const minFare = page.getByTestId('sim-min-fare');
@@ -83,7 +83,7 @@ test('Simulador Técnico: controles e cálculo do ticket', async ({ page }) => {
 });
 
 test('Multiplicador Horário: labels das opções', async ({ page }) => {
-  await page.goto('/#tab=16');
+  await page.goto('./#tab=16');
   const sel = page.getByTestId('sim-hour-multiplier');
   await expect(sel).toBeVisible();
   const optionsText = await sel.locator('option').allTextContents();

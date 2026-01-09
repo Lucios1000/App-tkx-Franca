@@ -1,8 +1,7 @@
 name: Release Cleanup on Tag Delete
 
 on:
-  delete:
-    types: [tag]
+  delete: {}
 
 permissions:
   contents: write

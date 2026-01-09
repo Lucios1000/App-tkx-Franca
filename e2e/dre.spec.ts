@@ -23,7 +23,7 @@ async function getCellValueByColumnIndex(page, rowIndex: number, colIndex: numbe
 
 test.describe('DRE detalhado: descontos e variáveis', () => {
   test('Headers presentes e sem coluna TECH', async ({ page }) => {
-    await page.goto('/#tab=7');
+    await page.goto('./#tab=7');
     await expect(page.getByText('DRE detalhado')).toBeVisible();
 
     const headers = await page.locator('table thead tr th').allTextContents();
@@ -40,7 +40,7 @@ test.describe('DRE detalhado: descontos e variáveis', () => {
   });
 
   test('Variáveis (Total) = soma de Gateway + Seguro + Manutenção + Provisão', async ({ page }) => {
-    await page.goto('/#tab=7');
+    await page.goto('./#tab=7');
     await expect(page.getByText('DRE detalhado')).toBeVisible();
 
     // Descobrir índices pelas headers para não depender de ordem fixa
