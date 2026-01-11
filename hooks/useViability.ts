@@ -4,6 +4,9 @@ import { ScenarioType, SimulationParams, MonthlyResult } from '../types';
 import { INITIAL_PARAMS, STORAGE_KEY } from '../constants';
 import { calculateProjections, auditYears } from '../services/financeEngine';
 
+// Chave atualizada para forçar o reset dos parâmetros no navegador do usuário
+const STORAGE_KEY_V4 = 'tkx_simulation_params_v4';
+
 export const useViability = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [scenario, setScenario] = useState<ScenarioType>(ScenarioType.REALISTA);
@@ -12,7 +15,7 @@ export const useViability = () => {
   const DEFAULT_VALUES: Record<ScenarioType, SimulationParams> = {
     [ScenarioType.REALISTA]: {
       ...INITIAL_PARAMS,
-      activeDrivers: 44,
+      activeDrivers: 5, // Base correta: 5 motoristas no Mês 1
       driverAdditionMonthly: 10,
       avgFare: 18.5,
       userGrowth: 15,
@@ -31,7 +34,7 @@ export const useViability = () => {
     }, 
     [ScenarioType.PESSIMISTA]: { 
       ...INITIAL_PARAMS, 
-      activeDrivers: 30,
+      activeDrivers: 3,
       driverAdditionMonthly: 10,
       avgFare: 17.5,
       userGrowth: 12,
@@ -50,7 +53,7 @@ export const useViability = () => {
     }, 
     [ScenarioType.OTIMISTA]: { 
       ...INITIAL_PARAMS, 
-      activeDrivers: 80,
+      activeDrivers: 10,
       driverAdditionMonthly: 13,
       avgFare: 18.5,
       userGrowth: 18,
@@ -71,7 +74,7 @@ export const useViability = () => {
 
   const [paramsMap, setParamsMap] = useState<Record<ScenarioType, SimulationParams>>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY_V4);
       if (saved) {
         const parsed = JSON.parse(saved) as Record<ScenarioType, SimulationParams>;
         return {
@@ -106,7 +109,7 @@ export const useViability = () => {
 
   // Salva automaticamente no LocalStorage sempre que os parâmetros mudarem
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(paramsMap));
+    localStorage.setItem(STORAGE_KEY_V4, JSON.stringify(paramsMap));
   }, [paramsMap]);
 
   // currentParams REATIVO - recalcula quando scenario ou paramsMap mudam

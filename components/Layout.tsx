@@ -1,5 +1,5 @@
 
-import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone, Zap, Save, Trash2, Rocket, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Map as MapIcon, Sliders, FileText, Users, PieChart, Briefcase, BarChart3, Target, UserCheck, Download, Printer, Megaphone, Zap, Save, Trash2, Rocket, ClipboardList, Activity } from 'lucide-react';
 import React from 'react';
 
 interface LayoutProps {
@@ -19,6 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onEx
     { id: 0, label: 'CALOR / DEMANDA', icon: <MapIcon size={22} /> },
     { id: 1, label: 'BENCH / MARKET SHARE', icon: <Users size={22} /> },
     { id: 2, label: 'MKT/CF', icon: <Megaphone size={22} /> },
+    { id: 18, label: 'ANÁLISE DE SENSIBILIDADE', icon: <Activity size={22} /> },
     { id: 15, label: 'PROJEÇÕES DE FESTAS/EVENTOS', icon: <Zap size={22} /> },
     { id: 3, label: 'PARAMETRIZAÇÃO', icon: <Sliders size={22} /> },
     { id: 4, label: 'DRIVERS/ ESCALA', icon: <UserCheck size={22} /> },

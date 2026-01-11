@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect, Suspense, lazy } from 'react';
-import { MapPin, Clock, Zap, Wallet } from 'lucide-react';
+import { MapPin, Clock, Zap, Wallet, Users, Car, Briefcase, TrendingUp, DollarSign, Activity, Target } from 'lucide-react';
 import Layout from './components/Layout';
 import SnapshotModal from './components/SnapshotModal';
 const ComparisonTab = React.lazy(() => import('./components/ComparisonTab'));
 import { ImplementationTab } from './ImplementationTab';
 import { InitialPlanningTab } from './InitialPlanningTab';
+import { SensitivityAnalysisTab } from './SensitivityAnalysisTab';
 const TrendAnalysisTab = React.lazy(() => import('./components/TrendAnalysisTab'));
 // Wrapper para lazy loading com fallback
 const LazyWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -97,7 +98,7 @@ const PARAM_SLIDERS: Array<{
   unit?: string;
 }> = [
   { key: 'initialInvestment', label: 'Investimento Inicial (R$)', paramKey: 'initialInvestment', min: 0, max: 200000, step: 1000 },
-  { key: 'activeDrivers', label: 'Frota Inicial', paramKey: 'activeDrivers', min: 0, max: 500, step: 1, unit: ' condutores' },
+  { key: 'activeDrivers', label: 'Frota Inicial', paramKey: 'activeDrivers', min: 1, max: 500, step: 1, unit: ' condutores' },
   { key: 'driverAdditionMonthly', label: 'Adição Mensal de Frota', paramKey: 'driverAdditionMonthly', min: 0, max: 100, step: 1, unit: ' condutores' },
   { key: 'avgFare', label: 'Tarifa Média (R$)', paramKey: 'avgFare', min: 10, max: 50, step: 0.5 },
   { key: 'ridesPerUserMonth', label: 'Corridas por Usuário/mês', paramKey: 'ridesPerUserMonth', min: 1, max: 10, step: 0.1 },
@@ -132,6 +133,52 @@ const FIDELITY_SLIDERS: Array<{
   { label: 'Elite Drivers (Semestral)', paramKey: 'eliteDriversSemestral', min: 0, max: 30000, step: 1000, description: 'R$ 10.000 base para 20 melhores motoristas' },
   { label: 'Fidelidade Passageiros (Anual)', paramKey: 'fidelidadePassageirosAnual', min: 0, max: 15000, step: 500, description: 'Sorteio iPhone e experiências VIP' },
   { label: 'Reserva Operacional (% Lucro Líq.)', paramKey: 'reservaOperacionalGMV', min: 0, max: 5, step: 0.1, description: 'Cashbacks e gatilhos de milha' },
+];
+
+// Dados Operacionais (Mês 1 ao 36)
+const OPERATIONAL_GROWTH = [
+  { month: 1, phase: 'Lançamento', users: 400, ridesDay: 56, drivers: 5 },
+  { month: 2, phase: 'Consolidação', users: 806, ridesDay: 113, drivers: 10 },
+  { month: 3, phase: 'Consolidação', users: 1212, ridesDay: 170, drivers: 15 },
+  { month: 4, phase: 'Consolidação', users: 1618, ridesDay: 227, drivers: 20 },
+  { month: 5, phase: 'Consolidação', users: 2024, ridesDay: 283, drivers: 25 },
+  { month: 6, phase: 'Consolidação Inicial', users: 2430, ridesDay: 340, drivers: 30 },
+  { month: 7, phase: 'Expansão', users: 3225, ridesDay: 452, drivers: 39 },
+  { month: 8, phase: 'Expansão', users: 4020, ridesDay: 563, drivers: 49 },
+  { month: 9, phase: 'Expansão', users: 4815, ridesDay: 674, drivers: 59 },
+  { month: 10, phase: 'Expansão', users: 5610, ridesDay: 785, drivers: 68 },
+  { month: 11, phase: 'Expansão', users: 6405, ridesDay: 897, drivers: 78 },
+  { month: 12, phase: 'Expansão Bairros', users: 7200, ridesDay: 1008, drivers: 88 },
+  { month: 13, phase: 'Crescimento', users: 7917, ridesDay: 1108, drivers: 96 },
+  { month: 14, phase: 'Crescimento', users: 8634, ridesDay: 1209, drivers: 105 },
+  { month: 15, phase: 'Crescimento', users: 9351, ridesDay: 1309, drivers: 114 },
+  { month: 16, phase: 'Crescimento', users: 10068, ridesDay: 1410, drivers: 123 },
+  { month: 17, phase: 'Crescimento', users: 10785, ridesDay: 1510, drivers: 131 },
+  { month: 18, phase: 'Crescimento', users: 11500, ridesDay: 1610, drivers: 140 },
+  { month: 19, phase: 'Tração', users: 12217, ridesDay: 1710, drivers: 149 },
+  { month: 20, phase: 'Tração', users: 12934, ridesDay: 1811, drivers: 157 },
+  { month: 21, phase: 'Tração', users: 13651, ridesDay: 1911, drivers: 166 },
+  { month: 22, phase: 'Tração', users: 14368, ridesDay: 2012, drivers: 175 },
+  { month: 23, phase: 'Tração', users: 15085, ridesDay: 2112, drivers: 184 },
+  { month: 24, phase: 'Maturidade', users: 15800, ridesDay: 2212, drivers: 192 },
+  { month: 25, phase: 'Estabilização', users: 16508, ridesDay: 2311, drivers: 201 },
+  { month: 26, phase: 'Estabilização', users: 17216, ridesDay: 2410, drivers: 210 },
+  { month: 27, phase: 'Estabilização', users: 17924, ridesDay: 2509, drivers: 218 },
+  { month: 28, phase: 'Estabilização', users: 18632, ridesDay: 2608, drivers: 227 },
+  { month: 29, phase: 'Estabilização', users: 19340, ridesDay: 2708, drivers: 235 },
+  { month: 30, phase: 'Estabilização', users: 20050, ridesDay: 2807, drivers: 244 },
+  { month: 31, phase: 'Estabilidade', users: 20758, ridesDay: 2906, drivers: 253 },
+  { month: 32, phase: 'Estabilidade', users: 21466, ridesDay: 3005, drivers: 261 },
+  { month: 33, phase: 'Estabilidade', users: 22174, ridesDay: 3104, drivers: 270 },
+  { month: 34, phase: 'Estabilidade', users: 22882, ridesDay: 3203, drivers: 279 },
+  { month: 35, phase: 'Estabilidade', users: 23590, ridesDay: 3303, drivers: 287 },
+  { month: 36, phase: 'Estabilidade (SOM)', users: 24300, ridesDay: 3402, drivers: 296 },
+];
+
+const DRIVER_PROFILES = [
+  { name: 'Full-Time', count: 89, desc: 'Dia todo (Grosso das corridas)', color: '#22c55e' },
+  { name: 'Part-Time', count: 118, desc: 'Horários de pico (Reforço)', color: '#eab308' },
+  { name: 'Esporádicos', count: 89, desc: 'Noites/Fim de semana/Eventos', color: '#3b82f6' },
 ];
 
 const App: React.FC = () => {
@@ -242,8 +289,114 @@ const App: React.FC = () => {
     setCampaignsSuspendedMap(prev => ({ ...prev, [scenario]: false }));
   };
 
-  const currentMonth = projections && projections.length > 0 ? projections[0] : undefined;
-  const lastMonth = projections && projections.length > 0 ? projections[projections.length - 1] : undefined;
+  // --- MOTOR DE CÁLCULO HÍBRIDO (Tabela Operacional + Parâmetros Financeiros) ---
+  // Usa os volumes da tabela OPERATIONAL_GROWTH e aplica os custos/tarifas dos sliders
+  const displayProjections = useMemo(() => {
+    let accumulatedProfit = -currentParams.initialInvestment;
+
+    // Fator de escala baseado no slider de Frota Inicial (Mês 1)
+    // Base da tabela: 5 motoristas no Mês 1. Se o slider for 10, tudo dobra.
+    const baseDriversM1 = 5;
+    const sliderDrivers = currentParams.activeDrivers;
+    const scaleFactor = baseDriversM1 > 0 ? sliderDrivers / baseDriversM1 : 1;
+
+    return OPERATIONAL_GROWTH.map((op, idx) => {
+      // 1. Volumes (Escalados pelo slider, mas com TETO de Mercado)
+      // Teto de usuários (SOM): ~30.000 (15% do mercado + margem)
+      const MAX_USERS_CAP = 30000;
+      
+      const drivers = Math.round(op.drivers * scaleFactor);
+      let users = Math.round(op.users * scaleFactor);
+      if (users > MAX_USERS_CAP) users = MAX_USERS_CAP;
+
+      // Corridas baseadas nos usuários ativos e frequência (slider)
+      const ridesPerUser = currentParams.ridesPerUserMonth || 4.2;
+      const rides = Math.round(users * ridesPerUser);
+
+      // 2. Receita (Baseada nos Sliders)
+      const avgFare = currentParams.avgFare || 18.5; // Fallback de segurança
+      const grossRevenue = rides * avgFare;
+      const takeRateRevenue = grossRevenue * 0.15; // 15% Take Rate Fixo
+
+      // 3. Custos Variáveis e Fixos (Baseados nos Sliders)
+      const taxes = grossRevenue * 0.06; // 6% Impostos estimados
+      const variableCosts = rides * 0.50; // Custo variável estimado por corrida (servidor/mapa)
+      
+      // Custos Fixos e Marketing
+      const fixedCosts = currentParams.fixedCosts;
+      const marketing = currentParams.marketingMonthly + currentParams.mktMensalOff + currentParams.trafegoPago;
+      const tech = currentParams.techMonthly;
+      
+      // Fidelidade e Campanhas
+      const cashback = (currentParams.reservaOperacionalGMV / 100) * takeRateRevenue; // % do Take Rate
+      const campaigns = currentParams.adesaoTurbo + currentParams.parceriasBares + currentParams.indiqueGanhe;
+      
+      // Custos Periódicos (Semestral/Anual)
+      const isSemestral = (op.month % 6) === 0;
+      const isAnual = (op.month % 12) === 0;
+      const eliteDriversCost = isSemestral ? currentParams.eliteDriversSemestral : 0;
+      const fidelidadePassageirosCost = isAnual ? currentParams.fidelidadePassageirosAnual : 0;
+
+      const totalMarketing = marketing + campaigns;
+      const totalTech = tech;
+
+      // 4. Resultado
+      const totalCosts = taxes + variableCosts + fixedCosts + totalMarketing + totalTech + cashback + eliteDriversCost + fidelidadePassageirosCost;
+      const netProfit = takeRateRevenue - totalCosts;
+      
+      accumulatedProfit += netProfit;
+
+      // KPIs e Capacidade
+      const MPD = 10.1;
+      const supplyCapacity = drivers * MPD * 30.5;
+      const utilizacao = supplyCapacity > 0 ? (rides / supplyCapacity) * 100 : 0;
+      
+      // Cálculo de CAC e LTV
+      const prevOp = idx > 0 ? OPERATIONAL_GROWTH[idx - 1] : null;
+      const prevUsers = prevOp ? Math.round(prevOp.users * scaleFactor) : 0;
+      const newUsers = Math.max(0, users - prevUsers);
+      const cac = newUsers > 0 ? totalMarketing / newUsers : 0;
+      
+      // LTV Simplificado (Receita Líquida por Usuário / Churn estimado de 5%)
+      const churnRate = 0.05; 
+      const arpu = users > 0 ? (takeRateRevenue - variableCosts - taxes) / users : 0;
+      const ltv = churnRate > 0 ? arpu / churnRate : 0;
+
+      return {
+        ...op, // month, phase, users, drivers
+        drivers, // Override com valor escalado
+        users,   // Override com valor escalado
+        rides,
+        grossRevenue,
+        takeRateGross: takeRateRevenue, // Para compatibilidade com DRE
+        takeRateRevenue,
+        netProfit,
+        accumulatedProfit,
+        margin: grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0,
+        taxes,
+        fixedCosts,
+        marketing,
+        totalMarketing,
+        tech,
+        totalTech,
+        variableCosts,
+        cashback,
+        eliteDriversCost,
+        fidelidadePassageirosCost,
+        reservaOperacionalCost: cashback,
+        cac,
+        ltv,
+        supplyCapacity,
+        demandedRides: rides,
+        utilizacao,
+        isSupplyBottleneck: utilizacao > 90,
+        demandGap: Math.max(0, rides - supplyCapacity)
+      };
+    });
+  }, [currentParams]);
+
+  const currentMonth = displayProjections[0];
+  const lastMonth = displayProjections[displayProjections.length - 1];
 
   const summary = useMemo(() => {
     const gross = currentMonth?.grossRevenue ?? 0;
@@ -252,12 +405,12 @@ const App: React.FC = () => {
     const drivers = currentMonth?.drivers ?? currentParams.activeDrivers;
     const users = currentMonth?.users ?? 0;
     return { gross, net, margin, drivers, users };
-  }, [currentMonth, currentParams.activeDrivers]);
+  }, [currentMonth]);
 
   const yearlyMetrics = useMemo(() => {
-    const y1 = projections ? projections.slice(0, 12) : [];
-    const y2 = projections ? projections.slice(12, 24) : [];
-    const y3 = projections ? projections.slice(24, 36) : [];
+    const y1 = displayProjections.slice(0, 12);
+    const y2 = displayProjections.slice(12, 24);
+    const y3 = displayProjections.slice(24, 36);
     const calcYear = (months: MonthlyResult[]) => ({
       revenue: months.reduce((a, m) => a + m.grossRevenue, 0),
       profit: months.reduce((a, m) => a + m.netProfit, 0),
@@ -266,7 +419,7 @@ const App: React.FC = () => {
       finalDrivers: months[months.length - 1]?.drivers ?? 0,
     });
     return { y1: calcYear(y1), y2: calcYear(y2), y3: calcYear(y3) };
-  }, [projections]);
+  }, [displayProjections]);
 
   // Handlers para Snapshots
   const handleSaveSnapshot = (name: string, description: string) => {
@@ -290,13 +443,13 @@ const App: React.FC = () => {
   // Função para exportar em Excel
   const handleExportExcel = async () => {
     try {
-      console.log('Iniciando exportação Excel...', { projectionsLength: projections ? projections.length : 0 });
+      console.log('Iniciando exportação Excel...', { projectionsLength: displayProjections.length });
       const XLSX = await import('xlsx');
       
       const wb = XLSX.utils.book_new();
       
       // Aba 1: DRE Detalhado
-      const dreData = projections.map((r, idx) => ({
+      const dreData = displayProjections.map((r, idx) => ({
         'Mês': `M${r.month}`,
         'GMV': r.grossRevenue || 0,
         'Take 15%': (r.grossRevenue || 0) * 0.15,
@@ -319,7 +472,7 @@ const App: React.FC = () => {
       XLSX.utils.book_append_sheet(wb, dreSheet, 'DRE');
       
       // Aba 2: Drivers
-      const driversData = projections.map((r) => ({
+      const driversData = displayProjections.map((r) => ({
         'Mês': `M${r.month}`,
         'Usuários': r.users || 0,
         'Frota': r.drivers || 0,
@@ -380,7 +533,7 @@ const App: React.FC = () => {
         const validDates = eventStartStr && eventEndStr && new Date(eventEndStr) >= new Date(eventStartStr);
         const msPerDay = 1000 * 60 * 60 * 24;
         const days = validDates ? (Math.floor((new Date(eventEndStr).getTime() - new Date(eventStartStr).getTime()) / msPerDay) + 1) : 0;
-        const baseMonthlyRides = projections && projections.length > 0 ? projections[0].rides || 0 : 0;
+        const baseMonthlyRides = displayProjections[0].rides || 0;
         const baseDailyRides = baseMonthlyRides / 30;
         const baseEventRides = Math.max(0, Math.round(baseDailyRides * days));
         const totalEventRides = Math.max(0, Math.round(baseEventRides * (1 + (ridesExtraPct || 0) / 100)));
@@ -496,26 +649,31 @@ const App: React.FC = () => {
         value: summary.gross,
         accent: 'text-gradient-gold',
         bg: 'from-yellow-500/10 to-orange-500/5',
+        icon: <DollarSign className="w-5 h-5 text-yellow-500" />
       }, {
         label: profitLabel(summary.net, 'Lucro Líquido (Mês 1)', 'Prejuízo (Mês 1)'),
         value: summary.net,
         isProfit: true,
         accent: profitColor(summary.net, 'text-gradient-green', 'text-gradient-red'),
         bg: summary.net >= 0 ? 'from-green-500/10 to-emerald-500/5' : 'from-red-500/10 to-rose-500/5',
+        icon: <TrendingUp className={`w-5 h-5 ${summary.net >= 0 ? 'text-green-500' : 'text-red-500'}`} />
       }, {
         label: 'Margem (Mês 1)',
         value: summary.margin,
         isPercent: true,
         accent: summary.margin >= 0 ? 'text-gradient-green' : 'text-gradient-red',
         bg: summary.margin >= 0 ? 'from-green-500/10 to-emerald-500/5' : 'from-red-500/10 to-rose-500/5',
+        icon: <Activity className="w-5 h-5 text-blue-500" />
       }, {
         label: 'Frota / Usuários',
         value: [summary.drivers, summary.users],
         isArray: true,
         accent: 'text-white',
         bg: 'from-blue-500/10 to-indigo-500/5',
+        icon: <Users className="w-5 h-5 text-indigo-500" />
       }].map((card) => (
-        <div key={card.label} className={`card-gradient hover-lift bg-gradient-to-br ${card.bg} border border-slate-700/50 p-4 rounded-xl shadow-lg`}>
+        <div key={card.label} className={`relative overflow-hidden bg-gradient-to-br ${card.bg} border border-slate-700/50 p-5 rounded-xl shadow-lg group hover:border-slate-600 transition-all`}>
+          <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity">{card.icon}</div>
           <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">{card.label}</div>
           <div className={`text-2xl font-black ${card.accent}`}>
             {card.isPercent ? <PercentDisplay value={card.value as number} /> : card.isArray ? (
@@ -958,7 +1116,7 @@ const App: React.FC = () => {
     const validDates = eventStartStr && eventEndStr && new Date(eventEndStr) >= new Date(eventStartStr);
     const msPerDay = 1000 * 60 * 60 * 24;
     const days = validDates ? (Math.floor((new Date(eventEndStr).getTime() - new Date(eventStartStr).getTime()) / msPerDay) + 1) : 0;
-    const baseMonthlyRides = projections && projections.length > 0 ? projections[0].rides || 0 : 0;
+    const baseMonthlyRides = displayProjections[0].rides || 0;
     const baseDailyRides = baseMonthlyRides / 30;
     const baseEventRides = Math.max(0, Math.round(baseDailyRides * days));
     const totalEventRides = Math.max(0, Math.round(baseEventRides * (1 + (ridesExtraPct || 0) / 100)));
@@ -1350,7 +1508,7 @@ const App: React.FC = () => {
     const MPD = 10.1; // Média de Produtividade Diária
     const startMonth = (yearPeriod - 1) * 12;
     const endMonth = yearPeriod * 12;
-    const rows = projections ? projections.slice(startMonth, endMonth).map((r) => {
+    const rows = displayProjections.slice(startMonth, endMonth).map((r) => {
       const target = Math.max(50, Math.round(r.users / 200));
       const cov = r.users > 0 ? (r.drivers * 200) / r.users : 0;
       const gap = r.drivers - target;
@@ -1360,7 +1518,7 @@ const App: React.FC = () => {
       const isBottleneck = r.isSupplyBottleneck || false;
       const demandGap = r.demandGap || 0;
       return { ...r, target, cov, gap, supplyCapacity, demandedRides, utilizacao, isBottleneck, demandGap };
-    }) : [];
+    });
 
     const bottleneckMonths = rows.length > 0 ? rows.filter(r => r.isBottleneck).length : 0;
     const avgUtilization = rows.length > 0 ? rows.reduce((a, r) => a + r.utilizacao, 0) / rows.length : 0;
@@ -1368,6 +1526,44 @@ const App: React.FC = () => {
 
     return (
       <div className="space-y-3">
+        {/* Perfil da Frota (M36) */}
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-black uppercase text-yellow-500 flex items-center gap-2">
+                <Car className="w-4 h-4" />
+                Perfil Operacional da Frota (Meta M36)
+              </h3>
+              <p className="text-xs text-slate-400">Distribuição para 296 motoristas ativos (Produtividade Média: 11,5 corridas/dia)</p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-black text-white">296</div>
+              <div className="text-[10px] text-slate-500 uppercase font-bold">Total Ativos</div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {DRIVER_PROFILES.map((profile) => (
+              <div key={profile.name} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-lg relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: profile.color }}></div>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-xs font-bold text-slate-200 uppercase">{profile.name}</div>
+                    <div className="text-[10px] text-slate-500 mt-1">{profile.desc}</div>
+                  </div>
+                  <div className="text-xl font-black" style={{ color: profile.color }}>{profile.count}</div>
+                </div>
+                <div className="mt-3 w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                  <div className="h-full" style={{ width: `${(profile.count / 296) * 100}%`, backgroundColor: profile.color }}></div>
+                </div>
+                <div className="text-[9px] text-right text-slate-500 mt-1">
+                  {((profile.count / 296) * 100).toFixed(0)}% da frota
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex gap-2 mb-4">
           {[1, 2, 3].map((period) => (
             <button
@@ -1405,7 +1601,7 @@ const App: React.FC = () => {
         <div className="card-gradient border border-slate-700/40 rounded-xl overflow-hidden">
           <table className="w-full text-xs text-slate-200">
             <thead className="bg-gradient-to-r from-slate-800 to-slate-900 text-[7px] uppercase text-slate-400 font-bold">
-              <tr>
+              <tr> 
                 <th className="p-2 text-left">Mês</th>
                 <th className="p-2 text-right">Usuários</th>
                 <th className="p-2 text-right">Frota</th>
@@ -1421,9 +1617,13 @@ const App: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/40">
-              {rows.map((r, idx) => (
+              {rows.map((r, idx) => {
+                const opData = OPERATIONAL_GROWTH[r.month - 1];
+                return (
                 <tr key={r.month} className={`${idx % 2 === 0 ? 'bg-slate-900/30' : ''} ${r.isBottleneck ? 'bg-red-900/10' : ''}`}>
-                  <td className="p-2 font-bold text-slate-100">M{r.month}</td>
+                  <td className="p-2 font-bold text-slate-100">
+                    M{r.month} <span className="text-[9px] font-normal text-slate-500 block">{opData?.phase}</span>
+                  </td>
                   <td className="p-2 text-right"><NumberDisplay value={r.users} /></td>
                   <td className="p-2 text-right"><NumberDisplay value={r.drivers} /></td>
                   <td className="p-2 text-right text-cyan-400">{(r.rides / r.drivers / 30.5).toFixed(2)}</td>
@@ -1442,7 +1642,8 @@ const App: React.FC = () => {
                     {r.isBottleneck ? <span className="text-red-400 font-bold">🔴 BOTTLENECK</span> : <span className="text-green-400">✓</span>}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1495,7 +1696,7 @@ const App: React.FC = () => {
       <h3 className="text-xs font-black uppercase text-yellow-400 tracking-[0.08em]">Projeções de Volume (36 meses)</h3>
       <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl h-[360px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={projections ? projections.slice((yearPeriod - 1) * 12, yearPeriod * 12) : []}>
+          <ComposedChart data={displayProjections.slice((yearPeriod - 1) * 12, yearPeriod * 12)}>
             <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="month" stroke="#475569" fontSize={10} />
             <YAxis yAxisId="left" stroke="#475569" fontSize={10} />
@@ -1518,13 +1719,13 @@ const App: React.FC = () => {
   );
 
   const renderKpis = () => {
-    const last = projections && projections.length > 0 ? projections[projections.length - 1] : undefined;
-    const first = projections && projections.length > 0 ? projections[0] : undefined;
+    const last = displayProjections[displayProjections.length - 1];
+    const first = displayProjections[0];
     const ratio = (last?.ltv || 0) / ((last?.cac || 1));
-    const cagr = Math.pow(projections[11].grossRevenue / (first?.grossRevenue || 1), 1/2) - 1;
+    const cagr = Math.pow(displayProjections[11].grossRevenue / (first?.grossRevenue || 1), 1/2) - 1;
     
     // Dados para gráfico de evolução LTV/CAC
-    const ltvCacData = projections.map(p => ({
+    const ltvCacData = displayProjections.map(p => ({
       month: p.month,
       monthName: p.monthName,
       cac: p.cac,
@@ -1577,10 +1778,10 @@ const App: React.FC = () => {
   };
 
   const renderCenarios = () => {
-    const scenarioProjections: Record<ScenarioType, MonthlyResult[]> = {
-      [ScenarioType.REALISTA]: calculateProjections(paramsMap[ScenarioType.REALISTA], ScenarioType.REALISTA),
-      [ScenarioType.PESSIMISTA]: calculateProjections(paramsMap[ScenarioType.PESSIMISTA], ScenarioType.PESSIMISTA),
-      [ScenarioType.OTIMISTA]: calculateProjections(paramsMap[ScenarioType.OTIMISTA], ScenarioType.OTIMISTA),
+    const scenarioProjections: Record<ScenarioType, any[]> = {
+      [ScenarioType.REALISTA]: displayProjections, // Usando a projeção baseada na tabela para o cenário atual
+      [ScenarioType.PESSIMISTA]: displayProjections.map(p => ({ ...p, grossRevenue: p.grossRevenue * 0.8, netProfit: p.netProfit * 0.7 })), // Simulação simples
+      [ScenarioType.OTIMISTA]: displayProjections.map(p => ({ ...p, grossRevenue: p.grossRevenue * 1.2, netProfit: p.netProfit * 1.3 })),
     };
 
     const scenariosData = Object.values(ScenarioType).map((t) => {
@@ -1825,7 +2026,7 @@ const App: React.FC = () => {
   };
 
   const renderVisao36m = () => {
-    const results = projections;
+    const results = displayProjections;
     const breakEvenIndex = results.findIndex((r) => r.netProfit > 0);
     const paybackIndex = results.findIndex((r) => r.accumulatedProfit > 0);
     const totalRides36 = results.reduce((acc, curr) => acc + curr.rides, 0);
@@ -1956,6 +2157,7 @@ const App: React.FC = () => {
         <table className="w-full text-xs text-slate-200">
           <thead className="bg-gradient-to-r from-slate-800 to-slate-900 text-[7px] uppercase text-slate-400 font-bold">
             <tr>
+              <th className="p-2 text-left">Fase</th>
               <th className="p-2 text-left">Mês</th>
               <th className="p-2 text-right">GMV</th>
               <th className="p-2 text-right">Take 15%</th>
@@ -1974,29 +2176,35 @@ const App: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/40">
-            {(filteredDreResults || []).slice((yearPeriod - 1) * 12, yearPeriod * 12).map((row, idx) => (
+            {displayProjections.slice((yearPeriod - 1) * 12, yearPeriod * 12).map((row, idx) => {
+              const opData = OPERATIONAL_GROWTH[row.month - 1];
+              return (
               <tr key={row.month} className={idx % 2 === 0 ? 'bg-slate-900/30' : ''}>
+                <td className="p-2 text-[9px] font-bold text-yellow-500/80 uppercase tracking-wider">
+                  {opData?.phase || '-'}
+                </td>
                 <td className="p-2 font-bold text-slate-100">M{row.month}</td>
                 <td className="p-2 text-right text-slate-300"><CurrencyDisplay value={row.grossRevenue} /></td>
                 <td className="p-2 text-right text-slate-300"><CurrencyDisplay value={row.takeRateGross} /></td>
-                <td className="p-2 text-right text-orange-400"><CurrencyDisplay value={row.cashback} /></td>
+                <td className="p-2 text-right text-orange-400"><CurrencyDisplay value={-row.cashback} colorClass="text-orange-400" /></td>
                 <td className="p-2 text-right font-semibold text-green-400"><CurrencyDisplay value={row.takeRateRevenue} /></td>
-                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.taxes} /></td>
-                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.fixedCosts} /></td>
-                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.marketing} /></td>
-                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.tech} /></td>
-                <td className="p-2 text-right text-red-300"><CurrencyDisplay value={row.variableCosts} /></td>
-                <td className="p-2 text-right text-orange-300"><CurrencyDisplay value={row.eliteDriversCost} /></td>
-                <td className="p-2 text-right text-orange-300"><CurrencyDisplay value={row.fidelidadePassageirosCost} /></td>
+                <td className="p-2 text-right text-red-400"><CurrencyDisplay value={-row.taxes} colorClass="text-red-400" /></td>
+                <td className="p-2 text-right text-red-400"><CurrencyDisplay value={-row.fixedCosts} colorClass="text-red-400" /></td>
+                <td className="p-2 text-right text-red-400"><CurrencyDisplay value={-row.totalMarketing} colorClass="text-red-400" /></td>
+                <td className="p-2 text-right text-red-400"><CurrencyDisplay value={-row.totalTech} colorClass="text-red-400" /></td>
+                <td className="p-2 text-right text-red-400"><CurrencyDisplay value={-row.variableCosts} colorClass="text-red-400" /></td>
+                <td className="p-2 text-right text-orange-400"><CurrencyDisplay value={-row.eliteDriversCost} colorClass="text-orange-400" /></td>
+                <td className="p-2 text-right text-orange-400"><CurrencyDisplay value={-row.fidelidadePassageirosCost} colorClass="text-orange-400" /></td>
                 <td className="p-2 text-right text-orange-300">
-                  {row.reservaOperacionalCost > 0 ? <CurrencyDisplay value={row.reservaOperacionalCost} /> : <span className="text-slate-600">—</span>}
+                  {row.reservaOperacionalCost > 0 ? <CurrencyDisplay value={-row.reservaOperacionalCost} colorClass="text-orange-300" /> : <span className="text-slate-600">—</span>}
                 </td>
                 <td className={`p-2 text-right font-bold ${profitColor(row.netProfit)}`}>
                   <CurrencyDisplay value={profitValue(row.netProfit)} colorClass={profitColor(row.netProfit)} />
                 </td>
                 <td className={`p-2 text-right ${row.margin >= 0 ? 'text-green-400' : 'text-red-400'}`}><PercentDisplay value={row.margin} /></td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -2031,7 +2239,7 @@ const App: React.FC = () => {
           <div className="text-center">
             <div className="text-xs text-slate-400 mb-1">Reserva Operacional</div>
             <div className="text-2xl font-black text-orange-300">
-              {formatCurrency(projections.reduce((sum, m) => sum + m.reservaOperacionalCost, 0))}
+              {formatCurrency(displayProjections.reduce((sum, m) => sum + (m.reservaOperacionalCost || 0), 0))}
             </div>
           </div>
           <div className="text-center">
@@ -2040,7 +2248,7 @@ const App: React.FC = () => {
               {formatCurrency(
                 (currentParams.eliteDriversSemestral * 6) + 
                 (currentParams.fidelidadePassageirosAnual * 3) + 
-                projections.reduce((sum, m) => sum + m.reservaOperacionalCost, 0)
+                displayProjections.reduce((sum, m) => sum + (m.reservaOperacionalCost || 0), 0)
               )}
             </div>
           </div>
@@ -2073,19 +2281,19 @@ const App: React.FC = () => {
   );
 
   const renderResumenEjecutivo = () => {
-    if (!projections || projections.length === 0) return null;
+    if (!displayProjections || displayProjections.length === 0) return null;
     
-    const currentMonth = projections ? Math.min(12, projections.length) : 0;
-    const m1 = projections && projections.length > 0 ? projections[0] : undefined;
-    const m12 = projections[11];
-    const m36 = projections[35];
+    const currentMonth = Math.min(12, displayProjections.length);
+    const m1 = displayProjections[0];
+    const m12 = displayProjections[11];
+    const m36 = displayProjections[35];
 
     // Quebra por período (anos 1, 2, 3 e total)
     const periodSlices = [
-      { key: 'y1', label: 'Ano 1', data: projections ? projections.slice(0, 12) : [] },
-      { key: 'y2', label: 'Ano 2', data: projections ? projections.slice(12, 24) : [] },
-      { key: 'y3', label: 'Ano 3', data: projections ? projections.slice(24, 36) : [] },
-      { key: 'total', label: '36m', data: projections }
+      { key: 'y1', label: 'Ano 1', data: displayProjections.slice(0, 12) },
+      { key: 'y2', label: 'Ano 2', data: displayProjections.slice(12, 24) },
+      { key: 'y3', label: 'Ano 3', data: displayProjections.slice(24, 36) },
+      { key: 'total', label: '36m', data: displayProjections }
     ];
 
     const driverChurnMonthlyRate = 1; // Assumimos 1% de churn mensal da frota como proxy
@@ -2154,8 +2362,8 @@ const App: React.FC = () => {
     
     // Break-even
     let breakEvenMonth = 0;
-    for (let i = 0; projections && i < projections.length; i++) {
-      if (projections[i].netProfit > 0) {
+    for (let i = 0; i < displayProjections.length; i++) {
+      if (displayProjections[i].netProfit > 0) {
         breakEvenMonth = i + 1;
         break;
       }
@@ -2243,10 +2451,10 @@ const App: React.FC = () => {
         {(() => {
           const MPD = 10.1;
           const periodMetrics = [
-            { label: 'Ano 1', data: projections ? projections.slice(0, 12) : [] },
-            { label: 'Ano 2', data: projections ? projections.slice(12, 24) : [] },
-            { label: 'Ano 3', data: projections ? projections.slice(24, 36) : [] },
-            { label: 'Total', data: projections }
+            { label: 'Ano 1', data: displayProjections.slice(0, 12) },
+            { label: 'Ano 2', data: displayProjections.slice(12, 24) },
+            { label: 'Ano 3', data: displayProjections.slice(24, 36) },
+            { label: 'Total', data: displayProjections }
           ].map((p) => {
             const d = p.data;
             if (!d.length) return { label: p.label, utilization: 0, fleetSize: 0, breakEvenMonth: '—', revGrowth: 0, userGrowth: 0, profitMargin: 0 };
@@ -2353,10 +2561,10 @@ const App: React.FC = () => {
         {/* Projection per period - Final metrics */}
         {(() => {
           const projectionData = [
-            { label: 'Ano 1', data: projections ? projections.slice(0, 12) : [] },
-            { label: 'Ano 2', data: projections ? projections.slice(12, 24) : [] },
-            { label: 'Ano 3', data: projections ? projections.slice(24, 36) : [] },
-            { label: 'Total', data: projections }
+            { label: 'Ano 1', data: displayProjections.slice(0, 12) },
+            { label: 'Ano 2', data: displayProjections.slice(12, 24) },
+            { label: 'Ano 3', data: displayProjections.slice(24, 36) },
+            { label: 'Total', data: displayProjections }
           ].map((p) => {
             const d = p.data;
             if (!d.length) return { label: p.label, users: 0, drivers: 0, rides: 0, grossRevenue: 0, accumulatedProfit: 0 };
@@ -2447,10 +2655,10 @@ const App: React.FC = () => {
         {(() => {
           const MPD = 10.1;
           const alertsPerPeriod = [
-            { label: 'Ano 1', data: projections ? projections.slice(0, 12) : [] },
-            { label: 'Ano 2', data: projections ? projections.slice(12, 24) : [] },
-            { label: 'Ano 3', data: projections ? projections.slice(24, 36) : [] },
-            { label: 'Total', data: projections }
+            { label: 'Ano 1', data: displayProjections.slice(0, 12) },
+            { label: 'Ano 2', data: displayProjections.slice(12, 24) },
+            { label: 'Ano 3', data: displayProjections.slice(24, 36) },
+            { label: 'Total', data: displayProjections }
           ].map((p) => {
             const d = p.data;
             if (!d.length) return { label: p.label, alerts: [] };
@@ -2564,6 +2772,8 @@ const App: React.FC = () => {
         return <ImplementationTab currentParams={currentParams} />;
       case 17:
         return <InitialPlanningTab currentParams={currentParams} updateCurrentParam={updateCurrentParam} />;
+      case 18:
+        return <SensitivityAnalysisTab currentParams={currentParams} calculateProjections={calculateProjections} currentScenario={scenario} />;
     }
   };
 
@@ -2616,7 +2826,7 @@ const App: React.FC = () => {
               </div>
               <div className="bg-slate-800/50 p-2 rounded-lg border border-slate-700/30">
                 <div className="text-[7px] text-slate-400 uppercase font-bold mb-1">Receita total</div>
-                <div className="text-lg font-black text-gradient-gold"><CurrencyDisplay value={projections.reduce((acc, r) => acc + r.grossRevenue, 0)} /></div>
+                <div className="text-lg font-black text-gradient-gold"><CurrencyDisplay value={displayProjections.reduce((acc, r) => acc + r.grossRevenue, 0)} /></div>
               </div>
               <div className="bg-slate-800/50 p-2 rounded-lg border border-slate-700/30">
                 <div className="text-[7px] text-slate-400 uppercase font-bold mb-1">{profitLabel(lastMonth.accumulatedProfit, 'Lucro acumulado', 'Prejuízo acumulado')}</div>
