@@ -1,0 +1,45 @@
+{
+  "name": "tkx-franca---dashboard-de-viabilidade-v.4.0",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+"scripts": {    "dev": "vite",    
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Sem testes configurados ainda\"",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "npx playwright install --with-deps"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-is": "^19.2.3",
+    "recharts": "^3.6.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.35.0",
+    "@types/node": "^20.12.7",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
+    "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^8.0.0",
+    "prettier": "^3.8.0",
+    "typescript": "~5.8.2",
+    "typescript-eslint": "^8.53.1",
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^0.21.1",
+    "vitest": "^2.1.8"
+  }
+}
