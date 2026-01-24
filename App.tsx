@@ -1,20 +1,10 @@
 import React, { useMemo, useState, useEffect, Suspense, lazy } from 'react';
-import { MapPin, Clock, Zap, Wallet, Users, Car, Briefcase, TrendingUp, DollarSign, Activity, Target, Globe, Database, Save, Trash2, FolderOpen } from 'lucide-react';
+import { MapPin, Clock, Zap, Wallet, Users, Car, Briefcase, TrendingUp, DollarSign, Activity, Target, Globe, Database, Save, Trash2, FolderOpen, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp } from 'lucide-react';
 import Layout from './components/Layout';
 import SnapshotModal from './components/SnapshotModal';
-const ComparisonTab = React.lazy(() => import('./components/ComparisonTab'));
 import { ImplementationTab } from './ImplementationTab';
 import { InitialPlanningTab } from './InitialPlanningTab';
 import { SensitivityAnalysisTab } from './SensitivityAnalysisTab';
-const TrendAnalysisTab = React.lazy(() => import('./components/TrendAnalysisTab'));
-const AITab = React.lazy(() => import('./components/AITab'));
-const TestTab = React.lazy(() => import('./components/TestTab'));
-// Wrapper para lazy loading com fallback
-const LazyWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Suspense fallback={<div style={{color:'#fff',textAlign:'center',marginTop:40}}>Carregando...</div>}>
-    {children}
-  </Suspense>
-);
 import { useViability } from './hooks/useViability';
 import { useSnapshots } from './hooks/useSnapshots';
 import { ScenarioType, MonthlyResult } from './types';
@@ -39,6 +29,18 @@ import {
   AreaChart,
 } from 'recharts';
 import { DarkTooltip, NeutralLegend } from './components/ChartUI';
+
+const ComparisonTab = React.lazy(() => import('./components/ComparisonTab'));
+const TrendAnalysisTab = React.lazy(() => import('./components/TrendAnalysisTab'));
+const AITab = React.lazy(() => import('./components/AITab'));
+const TestTab = React.lazy(() => import('./components/TestTab'));
+
+// Wrapper para lazy loading com fallback
+const LazyWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Suspense fallback={<div style={{color:'#fff',textAlign:'center',marginTop:40}}>Carregando...</div>}>
+    {children}
+  </Suspense>
+);
 
 const formatCurrency = (value?: number) =>
   typeof value === 'number'
@@ -101,6 +103,7 @@ const PARAM_SLIDERS: Array<{
 }> = [
   { key: 'activeDrivers', label: 'Frota Inicial', paramKey: 'activeDrivers', min: 0, max: 500, step: 1, unit: ' condutores' },
   { key: 'driverAdditionMonthly', label: 'Adição Mensal de Frota', paramKey: 'driverAdditionMonthly', min: 0, max: 100, step: 1, unit: ' condutores' },
+  { key: 'avgFare', label: 'Tarifa Média (R$)', paramKey: 'avgFare', min: 0, max: 50, step: 0.5 },
   { key: 'ridesPerUserMonth', label: 'Corridas por Usuário/mês', paramKey: 'ridesPerUserMonth', min: 0, max: 10, step: 0.1 },
   { key: 'userGrowth', label: 'Crescimento de Usuários (%)', paramKey: 'userGrowth', min: 0, max: 30, step: 1, unit: '%' },
 ];
@@ -113,7 +116,6 @@ const MKT_SLIDERS: Array<{
   step: number;
 }> = [
   { label: 'Investimento Inicial (R$)', paramKey: 'initialInvestment', min: 0, max: 200000, step: 1000 },
-  { label: 'Tarifa Média (R$)', paramKey: 'avgFare', min: 0, max: 50, step: 0.5 },
   { label: 'Custo Comercial + MKT (R$)', paramKey: 'custoComercialMkt', min: 0, max: 50000, step: 100 },
   { label: 'Despesas Básicas', paramKey: 'fixedCosts', min: 0, max: 50000, step: 100 },
   { label: 'Marketing (R$)', paramKey: 'marketingMonthly', min: 0, max: 50000, step: 100 },
@@ -251,6 +253,30 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
     paramsMap,
     calculateProjections, // Esta é a função que chamaremos com o 'modo'
   } = useViability();
+
+  // Estado para controle dos Acordeões na aba de Marketing
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    'investimentos': true,
+    'custos': true,
+    'marketing': true,
+    'fidelidade': true
+  });
+
+  const toggleSection = (id: string) => {
+    setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const [allExpanded, setAllExpanded] = useState(true);
+  const toggleAllSections = () => {
+    const newState = !allExpanded;
+    setAllExpanded(newState);
+    setOpenSections({
+      'investimentos': newState,
+      'custos': newState,
+      'marketing': newState,
+      'fidelidade': newState
+    });
+  };
 
   const handleResetRealWorld = () => {
     if (confirm('⚠️ ATENÇÃO: Deseja ZERAR todos os custos e investimentos do Mundo Real?\n\nIsso apagará os dados inseridos manualmente.')) {
@@ -524,7 +550,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
       const variableCosts = rides * 0.50; // Custo variável estimado por corrida (servidor/mapa)
       
       // Custos Fixos e Marketing
-      const fixedCosts = currentParams.fixedCosts;
+      const fixedCosts = currentParams.fixedCosts + (currentParams.custoComercialMkt || 0);
       const marketing = currentParams.marketingMonthly + currentParams.mktMensalOff + currentParams.trafegoPago;
       const tech = (grossRevenue * (currentParams.techFeePct || 0)) / 100;
       
@@ -649,7 +675,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
 
       const taxes = takeRateRevenue * 0.06;
       const variableCosts = rides * 0.50;
-      const fixedCosts = params.fixedCosts;
+      const fixedCosts = params.fixedCosts + (params.custoComercialMkt || 0);
       const marketing = params.marketingMonthly + params.mktMensalOff + params.trafegoPago;
       const tech = (grossRevenue * (params.techFeePct || 0)) / 100;
       const cashback = (params.reservaOperacionalGMV / 100) * takeRateRevenue;
@@ -1358,6 +1384,109 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
       { name: 'Indique/Ganhe', value: currentParams.indiqueGanhe || 0 },
     ];
     const colors = ['#0b1220', '#f59e0b', '#eab308', '#e5e7eb', '#ef4444', '#fbbf24'];
+
+    const getSectionTotal = (keys: string[]) => {
+      let currencySum = 0;
+      let pctSum = 0;
+      keys.forEach(k => {
+        const val = (currentParams as any)[k] || 0;
+        if (k === 'techFeePct' || k === 'reservaOperacionalGMV') {
+          pctSum += val;
+        } else {
+          currencySum += val;
+        }
+      });
+      const parts = [];
+      if (currencySum > 0) parts.push(formatCurrency(currencySum));
+      if (pctSum > 0) parts.push(`${pctSum.toFixed(1)}%`);
+      return parts.length > 0 ? parts.join(' + ') : 'R$ 0,00';
+    };
+
+    const renderAccordion = (id: string, title: string, icon: React.ReactNode, children: React.ReactNode, keys: string[], extra?: React.ReactNode) => {
+      const totalDisplay = getSectionTotal(keys);
+      const chartData = keys.map(key => {
+        const s = MKT_SLIDERS.find(x => x.paramKey === key) || FIDELITY_SLIDERS.find(x => x.paramKey === key) || PARAM_SLIDERS.find(x => x.paramKey === key);
+        let value = (currentParams as any)[key] || 0;
+        if (key === 'techFeePct') value = (displayProjections[0].grossRevenue * value / 100);
+        if (key === 'reservaOperacionalGMV') value = (displayProjections[0].takeRateRevenue * value / 100);
+        return { name: s?.label || key, value };
+      }).filter(d => d.value > 0);
+
+      return (
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden mb-3 transition-all duration-300">
+        <button
+          onClick={() => toggleSection(id)}
+          className="w-full flex items-center justify-between p-4 bg-slate-800/40 hover:bg-slate-800/60 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-1.5 rounded-lg bg-slate-800 text-slate-400`}>{icon}</div>
+            <div className="text-left">
+              <div className="text-xs font-black uppercase text-slate-200">{title}</div>
+              <div className="text-[10px] text-slate-400 font-mono">{totalDisplay}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {extra}
+            {openSections[id] ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+          </div>
+        </button>
+        {openSections[id] && (
+          <div className="p-5 border-t border-slate-800/50 bg-slate-900/20">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">{children}</div>
+              <div className="lg:col-span-1 flex flex-col justify-center items-center border-l border-slate-800/50 pl-6">
+                <div className="text-[10px] uppercase text-slate-500 font-bold mb-2">Breakdown de Custos</div>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                      <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={60} paddingAngle={2}>
+                        {chartData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={colors[index % colors.length]} stroke="#0f172a" strokeWidth={1} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<DarkTooltip formatter={(v) => formatCurrency(v as number)} />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-xs text-slate-600 italic">Sem dados</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );};
+
+    const renderSliderInput = (key: string) => {
+      const s = MKT_SLIDERS.find(x => x.paramKey === key) || FIDELITY_SLIDERS.find(x => x.paramKey === key);
+      if (!s) return null;
+      const isSuspended = campaignsSuspended && ['adesaoTurbo', 'parceriasBares', 'indiqueGanhe', 'eliteDriversSemestral', 'fidelidadePassageirosAnual', 'reservaOperacionalGMV'].includes(key);
+      
+      return (
+        <div key={s.paramKey} className="space-y-2">
+          <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
+            <span>{s.label}</span>
+            <span className={`${key.includes('tech') || key.includes('reserva') ? 'text-blue-400' : 'text-yellow-400'} text-sm`}>
+              {key === 'techFeePct' || key === 'reservaOperacionalGMV'
+                ? `${((currentParams as any)[key] || 0).toFixed(1)}%`
+                : formatCurrency((currentParams as any)[key])}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={s.min}
+            max={s.max}
+            step={s.step}
+            value={(currentParams as any)[s.paramKey]}
+            onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
+            className={`w-full ${key.includes('tech') || key.includes('reserva') ? 'accent-blue-500' : 'accent-yellow-500'} ${isSuspended ? 'opacity-40 cursor-not-allowed' : ''}`}
+            disabled={isSuspended}
+          />
+          {(s as any).description && <div className="text-[9px] text-slate-500">{(s as any).description}</div>}
+        </div>
+      );
+    };
+
     return (
       <div className="space-y-6">
         {/* Barra de Presets de Marketing */}
@@ -1549,145 +1678,68 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
         </div>
 
         <div className="space-y-6">
-          <h3 className="text-sm font-black uppercase text-yellow-500">Sliders de Marketing</h3>
-          {/* Controle de Campanhas */}
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl mb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-[10px] uppercase text-slate-400 font-black">Campanhas (Adesão, Parcerias, Indique/Ganhe)</div>
-                <div className="text-xs text-slate-500">Suspender campanhas não afeta Mídia OFF nem Tráfego Pago.</div>
-              </div>
-              {campaignsSuspended ? (
-                <button
-                  type="button"
-                  onClick={restoreCampaigns}
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
-                >
-                  Reativar Campanhas
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={suspendCampaigns}
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-all"
-                >
-                  Suspender Campanhas
-                </button>
-              )}
-            </div>
-            {campaignsSuspended && (
-              <div className="mt-3 bg-red-900/40 border border-red-700/60 p-3 rounded text-red-200 text-xs">
-                ⚠️ Campanhas suspensas neste cenário. Sliders desabilitados: <strong>Adesão Turbo</strong>, <strong>Parcerias</strong>, <strong>Indique/Ganhe</strong>,
-                <strong> Elite Drivers</strong>, <strong> Fidelidade Passageiros</strong> e <strong> Reserva Operacional</strong>. 
-                Mantidos ativos: <strong>Mídia OFF</strong> e <strong>Tráfego Pago</strong>.
-              </div>
-            )}
-          </div>
-          {(() => {
-            const primaryKeys = new Set<string>(['fixedCosts','marketingMonthly', 'techFeePct']);
-            const primary = (MKT_SLIDERS || []).filter(s => primaryKeys.has(String(s.paramKey)));
-            const rest = (MKT_SLIDERS || []).filter(s => !primaryKeys.has(String(s.paramKey)));
-            return (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                  {primary.map((s) => (
-                    <div key={s.paramKey} className="space-y-2">
-                      <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
-                        <span>{s.label}</span>
-                        <span className="text-yellow-400 text-sm">
-                          {s.paramKey === 'techFeePct' ? `${((currentParams as any)[s.paramKey] || 0).toFixed(1)}%` : formatCurrency((currentParams as any)[s.paramKey])}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={s.min}
-                        max={s.max}
-                        step={s.step}
-                        value={(currentParams as any)[s.paramKey]}
-                        onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
-                        className="w-full accent-yellow-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {rest.map((s) => (
-                    <div key={s.paramKey} className="space-y-2">
-                      <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
-                        <span>{s.label}</span>
-                        <span className="text-yellow-400 text-sm">{formatCurrency((currentParams as any)[s.paramKey])}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={s.min}
-                        max={s.max}
-                        step={s.step}
-                        value={(currentParams as any)[s.paramKey]}
-                        onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
-                        className={`w-full accent-yellow-500 ${campaignsSuspended && (s.paramKey === 'adesaoTurbo' || s.paramKey === 'parceriasBares' || s.paramKey === 'indiqueGanhe') ? 'opacity-40 cursor-not-allowed' : ''}`}
-                        disabled={campaignsSuspended && (s.paramKey === 'adesaoTurbo' || s.paramKey === 'parceriasBares' || s.paramKey === 'indiqueGanhe')}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </>
-            );
-          })()}
-          
-        </div>
-        
-        {/* Card de Custos Mínimos removido conforme solicitação */}
-        
-        {/* TKX DYNAMIC CONTROL: Sliders de Fidelidade */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 justify-between">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h3 className="text-sm font-black uppercase text-orange-500">🎯 TKX Dynamic Control - Fidelidade</h3>
-              <span className="text-[10px] text-slate-400 px-2 py-1 rounded-full bg-slate-800 border border-slate-700">Elite Drivers + Passageiros + Reserva Operacional</span>
+              <h3 className="text-sm font-black uppercase text-yellow-500">Configuração de Custos & Investimentos</h3>
+              <button 
+                onClick={toggleAllSections}
+                className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                {allExpanded ? <ChevronsUp className="w-3 h-3" /> : <ChevronsDown className="w-3 h-3" />}
+                {allExpanded ? 'Recolher' : 'Expandir'}
+              </button>
             </div>
+            <button type="button" onClick={campaignsSuspended ? restoreCampaigns : suspendCampaigns} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-white transition-all ${campaignsSuspended ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
+              {campaignsSuspended ? 'Reativar Campanhas' : 'Suspender Campanhas'}
+            </button>
+          </div>
+
+          {campaignsSuspended && (
+            <div className="bg-red-900/40 border border-red-700/60 p-3 rounded text-red-200 text-xs">
+              ⚠️ Campanhas suspensas. Sliders de Adesão, Parcerias, Indique/Ganhe e Fidelidade estão desabilitados.
+            </div>
+          )}
+
+          {renderAccordion('investimentos', 'Investimentos & Tarifas', <Wallet className="w-4 h-4 text-emerald-400" />, (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {renderSliderInput('initialInvestment')}
+              {renderSliderInput('custoComercialMkt')}
+            </div>
+          ), ['initialInvestment', 'custoComercialMkt'])}
+
+          {renderAccordion('custos', 'Custos Operacionais & Tech', <Zap className="w-4 h-4 text-blue-400" />, (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {renderSliderInput('fixedCosts')}
+              {renderSliderInput('techFeePct')}
+            </div>
+          ), ['fixedCosts', 'techFeePct'])}
+
+          {renderAccordion('marketing', 'Marketing & Crescimento', <TrendingUp className="w-4 h-4 text-pink-400" />, (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {renderSliderInput('marketingMonthly')}
+              {renderSliderInput('mktMensalOff')}
+              {renderSliderInput('trafegoPago')}
+              {renderSliderInput('adesaoTurbo')}
+              {renderSliderInput('parceriasBares')}
+              {renderSliderInput('indiqueGanhe')}
+            </div>
+          ), ['marketingMonthly', 'mktMensalOff', 'trafegoPago', 'adesaoTurbo', 'parceriasBares', 'indiqueGanhe'])}
+
+          {renderAccordion('fidelidade', 'Fidelidade (TKX Dynamic Control)', <Target className="w-4 h-4 text-orange-400" />, (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {renderSliderInput('eliteDriversSemestral')}
+              {renderSliderInput('fidelidadePassageirosAnual')}
+              {renderSliderInput('reservaOperacionalGMV')}
+            </div>
+          ), ['eliteDriversSemestral', 'fidelidadePassageirosAnual', 'reservaOperacionalGMV'], (
             <button
               type="button"
-              onClick={() => updateCurrentParam('reservaOperacionalGMV', 0)}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border border-orange-600 text-orange-300 hover:border-orange-400 hover:bg-orange-500/10 transition-all duration-300"
-              title="Zera apenas a Reserva Operacional (Cashback)"
+              onClick={(e) => { e.stopPropagation(); updateCurrentParam('reservaOperacionalGMV', 0); }}
+              className="px-2 py-1 rounded text-[9px] font-bold uppercase border border-orange-600 text-orange-300 hover:bg-orange-500/20 transition-all"
             >
               Zerar Cashback
             </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {FIDELITY_SLIDERS && FIDELITY_SLIDERS.map((s) => (
-              <div key={s.paramKey} className="space-y-2">
-                <div className="flex justify-between text-[10px] uppercase font-black text-slate-400">
-                  <span>{s.label}</span>
-                  <span className="text-orange-400 text-sm">
-                    {s.paramKey === 'reservaOperacionalGMV' ? `${((currentParams as any)[s.paramKey] || 0).toFixed(1)}%` : formatCurrency((currentParams as any)[s.paramKey] || 0)}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={s.min}
-                  max={s.max}
-                  step={s.step}
-                  value={(currentParams as any)[s.paramKey]}
-                  onChange={(e) => updateCurrentParam(s.paramKey as any, Number(e.target.value))}
-                  className={`w-full accent-orange-500 ${campaignsSuspended ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  disabled={campaignsSuspended}
-                />
-                <div className="text-[9px] text-slate-500">{s.description}</div>
-              </div>
-            ))}
-          </div>
-          <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/30 p-4 rounded-xl">
-            <div className="text-[10px] uppercase text-orange-400 font-black mb-2">💡 Consolidação de Campanhas</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-300">
-              <div>
-                <span className="font-bold text-orange-300">Motoristas:</span> Meritocracia por faixas - 🥉 Ouro 450+ (10%), 🥈 Prata 300-449 (12%), 🥉 Bronze 0-299 (15%). Premiação semestral para 20 melhores.
-              </div>
-              <div>
-                <span className="font-bold text-orange-300">Passageiros:</span> Gatilhos de 500, 1.000 e 2.000 corridas (Cashback, Select e Experiência/Sorteio).
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2773,6 +2825,32 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
           </button>
         ))}
       </div>
+
+      {/* Gráfico de Custos Fixos vs Variáveis */}
+      <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+        <h3 className="text-xs font-black uppercase text-yellow-400 tracking-[0.08em] mb-4">Evolução de Custos (Fixos vs Variáveis)</h3>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={displayProjections.slice((yearPeriod - 1) * 12, yearPeriod * 12).map(r => ({
+                month: r.month,
+                fixed: r.fixedCosts + r.totalMarketing + r.eliteDriversCost + r.fidelidadePassageirosCost,
+                variable: r.taxes + r.variableCosts + r.totalTech + r.cashback
+              }))}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+              <XAxis dataKey="month" stroke="#475569" fontSize={10} tickFormatter={(v) => `M${v}`} />
+              <YAxis stroke="#475569" fontSize={10} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }} formatter={(value: number) => formatCurrency(value)} />
+              <Legend content={<NeutralLegend />} />
+              <Bar dataKey="fixed" name="Custos Fixos + MKT" stackId="a" fill="#3b82f6" radius={[0, 0, 4, 4]} />
+              <Bar dataKey="variable" name="Custos Variáveis" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       <h3 className="text-xs font-black uppercase text-yellow-400 tracking-[0.08em]">DRE detalhado</h3>
       <div className="card-gradient border border-slate-700/40 rounded-xl overflow-hidden">
         <table className="w-full text-xs text-slate-200">
