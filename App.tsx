@@ -2804,7 +2804,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
 
     return (
       <div className="space-y-3">
-      {!currentParams.minCostsEnabled && (
+      {currentParams.custoComercialMkt === 0 && currentParams.fixedCosts === 0 && (
         <div className="bg-red-900 border border-red-500 p-4 rounded text-red-200 flex items-center gap-3">
           <span className="text-2xl">⚠️</span>
           <div>
