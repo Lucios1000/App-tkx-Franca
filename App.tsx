@@ -100,10 +100,10 @@ const PARAM_SLIDERS: Array<{
   unit?: string;
 }> = [
   { key: 'initialInvestment', label: 'Investimento Inicial (R$)', paramKey: 'initialInvestment', min: 0, max: 200000, step: 1000 },
-  { key: 'activeDrivers', label: 'Frota Inicial', paramKey: 'activeDrivers', min: 1, max: 500, step: 1, unit: ' condutores' },
+  { key: 'activeDrivers', label: 'Frota Inicial', paramKey: 'activeDrivers', min: 0, max: 500, step: 1, unit: ' condutores' },
   { key: 'driverAdditionMonthly', label: 'Adição Mensal de Frota', paramKey: 'driverAdditionMonthly', min: 0, max: 100, step: 1, unit: ' condutores' },
-  { key: 'avgFare', label: 'Tarifa Média (R$)', paramKey: 'avgFare', min: 10, max: 50, step: 0.5 },
-  { key: 'ridesPerUserMonth', label: 'Corridas por Usuário/mês', paramKey: 'ridesPerUserMonth', min: 1, max: 10, step: 0.1 },
+  { key: 'avgFare', label: 'Tarifa Média (R$)', paramKey: 'avgFare', min: 0, max: 50, step: 0.5 },
+  { key: 'ridesPerUserMonth', label: 'Corridas por Usuário/mês', paramKey: 'ridesPerUserMonth', min: 0, max: 10, step: 0.1 },
   { key: 'userGrowth', label: 'Crescimento de Usuários (%)', paramKey: 'userGrowth', min: 0, max: 30, step: 1, unit: '%' },
   { key: 'custoComercialMkt', label: 'Custo Comercial + MKT (R$)', paramKey: 'custoComercialMkt', min: 0, max: 50000, step: 100 },
 ];
@@ -137,6 +137,27 @@ const FIDELITY_SLIDERS: Array<{
   { label: 'Fidelidade Passageiros (Anual)', paramKey: 'fidelidadePassageirosAnual', min: 0, max: 15000, step: 500, description: 'Sorteio iPhone e experiências VIP' },
   { label: 'Reserva Operacional (% Lucro Líq.)', paramKey: 'reservaOperacionalGMV', min: 0, max: 5, step: 0.1, description: 'Cashbacks e gatilhos de milha' },
 ];
+
+const VIRTUAL_SCENARIOS = {
+  [ScenarioType.REALISTA]: {
+    marketingMonthly: 4000,
+    techFeePct: 0.5,
+    mktMensalOff: 1500,
+    adesaoTurbo: 1500,
+    trafegoPago: 5000,
+    parceriasBares: 500,
+    indiqueGanhe: 1500,
+    eliteDriversSemestral: 3000,
+    fidelidadePassageirosAnual: 5000,
+    reservaOperacionalGMV: 1
+  },
+  [ScenarioType.PESSIMISTA]: {
+    marketingMonthly: 3000, techFeePct: 0.5, mktMensalOff: 1000, adesaoTurbo: 1000, trafegoPago: 4000, parceriasBares: 0, indiqueGanhe: 1000, eliteDriversSemestral: 3000, fidelidadePassageirosAnual: 5000, reservaOperacionalGMV: 1
+  },
+  [ScenarioType.OTIMISTA]: {
+    marketingMonthly: 6000, techFeePct: 0.5, mktMensalOff: 3000, adesaoTurbo: 3000, trafegoPago: 7000, parceriasBares: 1500, indiqueGanhe: 2000, eliteDriversSemestral: 3000, fidelidadePassageirosAnual: 5000, reservaOperacionalGMV: 1
+  }
+};
 
 // Dados Operacionais (Mês 1 ao 36)
 const OPERATIONAL_GROWTH = [
@@ -184,6 +205,27 @@ const DRIVER_PROFILES = [
   { name: 'Esporádicos', count: 89, desc: 'Noites/Fim de semana/Eventos', color: '#3b82f6' },
 ];
 
+const ZERO_PARAMS = {
+  fixedCosts: 0,
+  marketingMonthly: 0,
+  techFeePct: 0,
+  mktMensalOff: 0,
+  adesaoTurbo: 0,
+  trafegoPago: 0,
+  parceriasBares: 0,
+  indiqueGanhe: 0,
+  eliteDriversSemestral: 0,
+  fidelidadePassageirosAnual: 0,
+  reservaOperacionalGMV: 0,
+  initialInvestment: 0,
+  custoComercialMkt: 0,
+  activeDrivers: 0,
+  driverAdditionMonthly: 0,
+  avgFare: 0,
+  ridesPerUserMonth: 0,
+  userGrowth: 0,
+};
+
 interface DashboardProps {
   worldMode: 'Virtual' | 'Real';
   toggleWorld: () => void;
@@ -210,6 +252,14 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
     calculateProjections, // Esta é a função que chamaremos com o 'modo'
   } = useViability();
 
+  const handleResetRealWorld = () => {
+    if (confirm('⚠️ ATENÇÃO: Deseja ZERAR todos os custos e investimentos do Mundo Real?\n\nIsso apagará os dados inseridos manualmente.')) {
+      Object.entries(ZERO_PARAMS).forEach(([key, value]) => {
+        updateCurrentParam(key as any, value);
+      });
+    }
+  };
+
   const {
     snapshots,
     saveSnapshot,
@@ -220,6 +270,26 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
     importSnapshots,
     duplicateSnapshot,
   } = useSnapshots();
+
+  // Aplica os valores padrão do Mundo Virtual (apenas uma vez)
+  useEffect(() => {
+    if (worldMode === 'Virtual') {
+      const applied = localStorage.getItem('tkx_virtual_defaults_v1');
+      if (!applied) {
+        Object.entries(VIRTUAL_SCENARIOS).forEach(([scen, params]) => {
+          Object.entries(params).forEach(([key, val]) => {
+            updateScenarioParam(scen as ScenarioType, key as any, val);
+          });
+        });
+        // Atualiza também os parâmetros atuais se corresponderem ao cenário ativo
+        const activeDefaults = VIRTUAL_SCENARIOS[scenario];
+        if (activeDefaults) {
+          Object.entries(activeDefaults).forEach(([key, val]) => updateCurrentParam(key as any, val));
+        }
+        localStorage.setItem('tkx_virtual_defaults_v1', 'true');
+      }
+    }
+  }, [worldMode]);
 
   const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
   const [yearPeriod, setYearPeriod] = useState<1 | 2 | 3>(1);
@@ -3370,7 +3440,17 @@ case 19:
             </div>
             
             {/* Botão de Troca de Mundo */}
-            <div className="absolute top-5 right-5 lg:static lg:top-auto lg:right-auto">
+            <div className="absolute top-5 right-5 lg:static lg:top-auto lg:right-auto flex items-center gap-3">
+              {worldMode === 'Real' && (
+                <button
+                  onClick={handleResetRealWorld}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-xs uppercase transition-all duration-300 border border-red-500/50 text-red-400 hover:bg-red-500/10 hover:shadow-lg hover:shadow-red-500/10"
+                  title="Zerar todos os custos para iniciar nova análise"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Zerar
+                </button>
+              )}
               <button
                 onClick={toggleWorld}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs uppercase transition-all duration-300 shadow-lg border-2 ${
@@ -3459,7 +3539,7 @@ const App: React.FC = () => {
   const toggleWorld = () => {
     const currentParams = localStorage.getItem('tkx_simulation_params');
     
-    // Salva o estado do mundo atual
+    // Salva o estado do mundo atual (Virtual ou Real)
     if (currentParams) {
       localStorage.setItem(`tkx_params_${worldMode}`, currentParams);
     }
@@ -3467,15 +3547,20 @@ const App: React.FC = () => {
     // Determina o novo mundo
     const nextMode = worldMode === 'Virtual' ? 'Real' : 'Virtual';
     
-    // Carrega o estado do novo mundo
+    // Tenta carregar o estado salvo do novo mundo
     const nextParams = localStorage.getItem(`tkx_params_${nextMode}`);
+
     if (nextParams) {
       localStorage.setItem('tkx_simulation_params', nextParams);
     } else {
-      // Se não houver dados salvos para o novo mundo, limpa para usar os defaults
-      // ou copia do virtual se for a primeira vez no Real? 
-      // Melhor limpar para garantir separação, o hook useViability carregará defaults.
-      localStorage.removeItem('tkx_simulation_params');
+      // Se não houver estado salvo:
+      if (nextMode === 'Real') {
+        // Mundo Real: Começa com sliders de custo zerados (apenas na primeira vez)
+        localStorage.setItem('tkx_simulation_params', JSON.stringify(ZERO_PARAMS));
+      } else {
+        // Mundo Virtual: Carrega defaults do hook (que serão atualizados pelo useEffect com VIRTUAL_SCENARIOS)
+        localStorage.removeItem('tkx_simulation_params');
+      }
     }
 
     // Atualiza estado e força remontagem

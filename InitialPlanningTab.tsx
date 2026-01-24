@@ -133,6 +133,7 @@ export const InitialPlanningTab: React.FC<InitialPlanningTabProps> = ({ currentP
   const [mockRides, setMockRides] = useState<any[]>([]);
   const [showOnlyLoss, setShowOnlyLoss] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [simulationQty, setSimulationQty] = useState(50);
   const itemsPerPage = 10;
 
   const downloadSqlSchema = () => {
@@ -211,7 +212,7 @@ CREATE TABLE IF NOT EXISTS clientes (
 
   const generateMockData = () => {
     const rides = [];
-    for (let i = 1; i <= 50; i++) {
+    for (let i = 1; i <= simulationQty; i++) {
       const hour = Math.floor(Math.random() * 24);
       const schedule = tariffSchedules.find(s => hour >= s.start && hour < s.end) || tariffSchedules[0];
       const dist = 2 + Math.random() * 10; // 2-12km
@@ -1299,7 +1300,11 @@ CREATE TABLE IF NOT EXISTS clientes (
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-100">Simulação de Histórico (SQL Preview)</h3>
-              <p className="text-xs text-slate-400">Geração de dados para a tabela <code>historico_corridas</code> do <strong>Mundo {worldMode}</strong>.</p>
+              <p className="text-xs text-slate-400">
+                {worldMode === 'Virtual' 
+                  ? 'Geração de dados fictícios para validação de unit economics.' 
+                  : 'No Mundo Real, esta funcionalidade conecta-se ao banco de dados de produção (Simulação Desativada).'}
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -1315,11 +1320,29 @@ CREATE TABLE IF NOT EXISTS clientes (
             >
               <AlertTriangle className="w-3 h-3" /> Apenas Prejuízo
             </button>
+            {worldMode === 'Virtual' && (
+              <div className="flex items-center gap-2 mr-2 bg-slate-800 p-1 rounded border border-slate-700">
+                <span className="text-[10px] text-slate-400 uppercase font-bold pl-1">Qtd:</span>
+                <input 
+                  type="number" 
+                  value={simulationQty} 
+                  onChange={(e) => setSimulationQty(Number(e.target.value))}
+                  className="w-16 bg-slate-900 border border-slate-700 rounded p-1 text-xs text-white text-center outline-none focus:border-indigo-500"
+                  min={1}
+                  max={5000}
+                />
+              </div>
+            )}
             <button 
               onClick={generateMockData}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors"
+              disabled={worldMode === 'Real'}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                worldMode === 'Real' 
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              }`}
             >
-              <RefreshCw className="w-3 h-3" /> Gerar Dados Fictícios
+              <RefreshCw className="w-3 h-3" /> {worldMode === 'Real' ? 'Simulação Bloqueada' : 'Gerar Dados Fictícios'}
             </button>
           </div>
         </div>
