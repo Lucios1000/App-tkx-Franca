@@ -36,6 +36,9 @@ export interface SimulationParams {
   fidelidadePassageirosAnual: number;
   reservaOperacionalGMV: number;
   takeRateEfetivo: number;
+  marketPopulation?: number;
+  marketSamPercent?: number;
+  marketSomPercent?: number;
   currentUsersReal?: number; // Novo: para o Mundo Real
 }
 

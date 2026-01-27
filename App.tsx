@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, Suspense, lazy } from 'react';
+﻿import React, { useMemo, useState, useEffect, Suspense, lazy } from 'react';
 import { MapPin, Clock, Zap, Wallet, Users, Car, Briefcase, TrendingUp, DollarSign, Activity, Target, Globe, Database, Save, Trash2, FolderOpen, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp } from 'lucide-react';
 import Layout from './components/Layout';
 import SnapshotModal from './components/SnapshotModal';
@@ -42,16 +42,38 @@ const LazyWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </Suspense>
 );
 
+const isFiniteNumber = (value?: number): value is number => typeof value === 'number' && Number.isFinite(value);
+
 const formatCurrency = (value?: number) =>
-  typeof value === 'number'
-    ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+  isFiniteNumber(value)
+    ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : '—';
 
 const formatNumber = (value?: number) =>
-  typeof value === 'number' ? value.toLocaleString('pt-BR') : '—';
+  isFiniteNumber(value) ? value.toLocaleString('pt-BR') : '—';
 
-const formatPercent = (value?: number, digits = 1) =>
-  typeof value === 'number' ? `${value.toFixed(digits)}%` : '—';
+const formatPercent = (value?: number, digits = 2) =>
+  isFiniteNumber(value) ? `${value.toFixed(digits)}%` : '—';
+
+type PricingConfig = {
+  tariff?: {
+    base_fare?: number;
+    per_km?: number;
+    min_fare?: number;
+    tech_fee_fixed?: number;
+    take_rate_pct?: number;
+    included_km?: number;
+  };
+  dynamic_schedules?: Array<{
+    periodo: string;
+    hora_inicio: string;
+    hora_fim: string;
+    multiplicador: number;
+  }>;
+  source?: {
+    generated_at?: string;
+  };
+};
 
 // Componentes para renderização refinada
 const CurrencyDisplay: React.FC<{ value?: number; colorClass?: string; abs?: boolean }> = ({ value, colorClass = 'text-yellow-300', abs = false }) => {
@@ -63,12 +85,12 @@ const NumberDisplay: React.FC<{ value?: number }> = ({ value }) => (
   <span className="font-mono text-sm font-semibold text-slate-100">{formatNumber(value)}</span>
 );
 
-const PercentDisplay: React.FC<{ value?: number; digits?: number }> = ({ value, digits = 1 }) => (
+const PercentDisplay: React.FC<{ value?: number; digits?: number }> = ({ value, digits = 2 }) => (
   <span className="font-mono text-sm font-semibold">{formatPercent(value, digits)}</span>
 );
 
 const profitLabel = (value?: number, positiveLabel = 'Lucro', negativeLabel = 'Prejuízo') =>
-  typeof value === 'number' && value < 0 ? negativeLabel : positiveLabel;
+  isFiniteNumber(value) && value < 0 ? negativeLabel : positiveLabel;
 
 const profitColor = (value?: number, positiveClass = 'text-green-400', negativeClass = 'text-red-400') =>
   typeof value === 'number' && value < 0 ? negativeClass : positiveClass;
@@ -235,6 +257,7 @@ interface DashboardProps {
 
 const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) => {
   const [modo, setModo] = useState<'Simulação' | 'Real'>('Simulação');
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
   const {
     activeTab,
     setActiveTab,
@@ -316,6 +339,26 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
       }
     }
   }, [worldMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const baseUrl = (import.meta as any).env?.BASE_URL || '/';
+        const res = await fetch(`${baseUrl}pricing_config.json`, { cache: 'no-cache' });
+        if (!res.ok) return;
+        const json = (await res.json()) as PricingConfig;
+        if (!cancelled) setPricingConfig(json);
+      } catch {
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
   const [yearPeriod, setYearPeriod] = useState<1 | 2 | 3>(1);
@@ -1455,7 +1498,8 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
           </div>
         )}
       </div>
-    );};
+    );
+    };
 
     const renderSliderInput = (key: string) => {
       const s = MKT_SLIDERS.find(x => x.paramKey === key) || FIDELITY_SLIDERS.find(x => x.paramKey === key);
@@ -1780,398 +1824,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
               </PieChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      </div>
-    );
-  };
 
-  const renderFestasEventos = () => {
-    const validDates = eventStartStr && eventEndStr && new Date(eventEndStr) >= new Date(eventStartStr);
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const days = validDates ? (Math.floor((new Date(eventEndStr).getTime() - new Date(eventStartStr).getTime()) / msPerDay) + 1) : 0;
-    const baseMonthlyRides = displayProjections[0].rides || 0;
-    const baseDailyRides = baseMonthlyRides / 30;
-    const baseEventRides = Math.max(0, Math.round(baseDailyRides * days));
-    const totalEventRides = Math.max(0, Math.round(baseEventRides * (1 + (ridesExtraPct || 0) / 100)));
-    const avgFareBase = currentParams.avgFare || 0;
-    const avgFareAdj = avgFareBase * (1 + (dynamicPct || 0) / 100);
-    const gmvEvent = totalEventRides * avgFareAdj;
-    const takeRate = (currentParams as any).takeRate ?? 0.15;
-    const plataformaReceita = gmvEvent * takeRate;
-    const extraProfitPerRidePct = avgFareBase > 0 ? ((avgFareAdj - avgFareBase) / avgFareBase) * 100 : 0;
-    const MPD = 10.1;
-    const driversCapacity = Math.floor((driversNeeded || 0) * MPD * Math.max(1, days));
-    const coberturaPct = totalEventRides > 0 ? Math.min(100, (driversCapacity / totalEventRides) * 100) : 0;
-    const driversSugeridos = days > 0 ? Math.ceil((totalEventRides / (MPD * days)) || 0) : 0;
-    const corridasDiaNecessarias = days > 0 ? Math.ceil(totalEventRides / days) : 0;
-    const corridasPorDriverDia = (driversNeeded || 0) > 0 && days > 0 ? (totalEventRides / days) / driversNeeded : 0;
-    const dailyCapacity = (driversNeeded || 0) * MPD;
-    const perDayRidesConst = corridasDiaNecessarias;
-    const sCurveWeights = (n: number) => {
-      if (n <= 0) return [] as number[];
-      const mid = (n - 1) * peakPosition; // controla onde ocorre o pico
-      const k = curveIntensity; // controla quão acentuado é o pico
-      const raw = Array.from({ length: n }, (_, i) => {
-        const s = 1 / (1 + Math.exp(-k * (i - mid)));
-        return s * (1 - s); // derivada logística (s-curve bell)
-      });
-      const sum = raw.reduce((a, b) => a + b, 0) || 1;
-      return raw.map(v => v / sum);
-    };
-    const weights = distributionMode === 'curvaS' ? sCurveWeights(days) : [];
-    const eventDailyData = Array.from({ length: days }, (_, i) => ({
-      day: i + 1,
-      rides: distributionMode === 'curvaS' ? Math.round(totalEventRides * (weights[i] || 0)) : perDayRidesConst,
-      capacity: dailyCapacity,
-    }));
-    const peakIdx = eventDailyData.reduce((maxI, d, i) => (d.rides > (eventDailyData[maxI]?.rides || 0) ? i : maxI), 0);
-    const peakDay = eventDailyData[peakIdx]?.day || 1;
-
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-black uppercase text-yellow-500">Projeções de Festas/Eventos</h3>
-          <span className="text-[10px] text-slate-400 px-2 py-1 rounded-full bg-slate-800 border border-slate-700">Selecione período e parâmetros</span>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Início do evento</div>
-              <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
-                value={eventStartStr} onChange={(e) => setEventStartStr(e.target.value)} />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Fim do evento</div>
-              <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
-                value={eventEndStr} onChange={(e) => setEventEndStr(e.target.value)} />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Dinâmica sobre tarifa (%)</div>
-              <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm" placeholder="ex.: 25"
-                value={dynamicPct} onChange={(e) => setDynamicPct(Number(e.target.value))} />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">% adicional de corridas</div>
-              <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm" placeholder="ex.: 40"
-                value={ridesExtraPct} onChange={(e) => setRidesExtraPct(Number(e.target.value))} />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Drivers necessários</div>
-              <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm" placeholder="ex.: 120"
-                value={driversNeeded} onChange={(e) => setDriversNeeded(Number(e.target.value))} />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Distribuição diária</div>
-              <select
-                className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm"
-                value={distributionMode}
-                onChange={(e) => setDistributionMode(e.target.value as 'constante' | 'curvaS')}
-              >
-                <option value="constante">Constante</option>
-                <option value="curvaS">Curva S</option>
-              </select>
-            </div>
-            {distributionMode === 'curvaS' && (
-              <div>
-                <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Intensidade da curva (k)</div>
-                <input
-                  type="range"
-                  min={0.2}
-                  max={1.2}
-                  step={0.05}
-                  value={curveIntensity}
-                  onChange={(e) => setCurveIntensity(Number(e.target.value))}
-                  className="w-full accent-yellow-500"
-                />
-                <div className="text-[11px] text-slate-500 mt-1">Picos mais acentuados com valores maiores ({curveIntensity.toFixed(2)}).</div>
-              </div>
-            )}
-            {distributionMode === 'curvaS' && (
-              <div>
-                <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Posição do pico</div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={peakPosition}
-                  onChange={(e) => setPeakPosition(Number(e.target.value))}
-                  className="w-full accent-yellow-500"
-                />
-                <div className="text-[11px] text-slate-500 mt-1">0 = início • 0,5 = meio • 1 = fim ({peakPosition.toFixed(2)}).</div>
-              </div>
-            )}
-          </div>
-          <div className="mt-3 text-[12px] text-slate-400">
-            {validDates ? (
-              <span>Período selecionado: <span className="text-yellow-400 font-bold">{days}</span> dia(s). Base diária estimada: <span className="text-yellow-400 font-bold">{Math.round(baseDailyRides)}</span> corridas/dia.</span>
-            ) : (
-              <span className="text-red-400">Selecione datas válidas para calcular as projeções.</span>
-            )}
-          </div>
-        </div>
-
-        {validDates && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Corridas estimadas no período</div>
-              <div className="text-2xl font-black text-white" data-testid="event-total-rides"><NumberDisplay value={totalEventRides} /></div>
-              <div className="text-[11px] text-slate-500">Base: {baseEventRides} • Adic.: {ridesExtraPct}%</div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">Tarifa média com dinâmica</div>
-              <div className="text-2xl font-black text-gradient-gold" data-testid="event-avg-fare-adj"><CurrencyDisplay value={avgFareAdj} /></div>
-              <div className="text-[11px] text-slate-500">Base: <span data-testid="event-avg-fare-base"><CurrencyDisplay value={avgFareBase} /></span> • Dinâmica: {dynamicPct || 0}%</div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-1">% lucro extra por corrida</div>
-              <div className="text-2xl font-black text-gradient-green"><PercentDisplay value={extraProfitPerRidePct} /></div>
-              <div className="text-[11px] text-slate-500">Considerando take rate de {(takeRate * 100).toFixed(0)}%</div>
-            </div>
-          </div>
-        )}
-
-        {validDates && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-2">Faturamento estimado do evento</div>
-              <div className="grid grid-cols-2 gap-4 text-slate-200">
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">GMV (corridas x tarifa)</div>
-                  <div className="text-xl font-black text-gradient-gold" data-testid="event-gmv"><CurrencyDisplay value={gmvEvent} /></div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Receita plataforma (take rate)</div>
-                  <div className="text-xl font-black text-gradient-gold" data-testid="event-platform-revenue"><CurrencyDisplay value={plataformaReceita} /></div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Corridas/dia necessárias</div>
-                  <div className="text-xl font-black" data-testid="event-rides-per-day-required"><NumberDisplay value={corridasDiaNecessarias} /></div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Corridas por driver/dia</div>
-                  <div className="text-xl font-black"><NumberDisplay value={Math.ceil(corridasPorDriverDia)} /></div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-              <div className="text-[10px] uppercase text-slate-400 font-black mb-2">Capacidade de atendimento</div>
-              <div className="grid grid-cols-2 gap-4 text-slate-200">
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Drivers informados</div>
-                  <div className="text-xl font-black" data-testid="event-drivers-input"><NumberDisplay value={driversNeeded || 0} /></div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Capacidade (corridas)</div>
-                  <div className="text-xl font-black" data-testid="event-capacity"><NumberDisplay value={driversCapacity} /></div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Cobertura da demanda</div>
-                  <div className={`text-xl font-black ${coberturaPct >= 100 ? 'text-gradient-green' : 'text-yellow-300'}`} data-testid="event-coverage"><PercentDisplay value={coberturaPct} /></div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Drivers sugeridos</div>
-                  <div className="text-xl font-black" data-testid="event-drivers-suggested"><NumberDisplay value={driversSugeridos} /></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {validDates && (
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-            <div className="text-[10px] uppercase text-slate-400 font-black mb-2">Corridas/dia x Capacidade (período do evento)</div>
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart data={eventDailyData}>
-                <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="day" stroke="#475569" fontSize={10} label={{ value: 'Dia', position: 'insideBottomRight', offset: -4, fill: '#94a3b8' }} />
-                <YAxis stroke="#475569" fontSize={10} />
-                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'transparent', stroke: 'transparent' }} />
-                <Legend content={<NeutralLegend />} />
-                <ReferenceLine x={peakDay} stroke="#eab308" strokeDasharray="4 2" label={{ value: `Pico (Dia ${peakDay})`, position: 'top', fill: '#eab308', fontSize: 10 }} />
-                <defs>
-                  <linearGradient id="gradRidesEventos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fbbf24" />
-                    <stop offset="100%" stopColor="#f59e0b" />
-                  </linearGradient>
-                </defs>
-                <Bar dataKey="rides" name="Corridas/dia" fill="url(#gradRidesEventos)" radius={[8,8,2,2]} opacity={0.95} stroke="#0b1220" strokeWidth={2} />
-                <Line type="monotone" dataKey="capacity" name="Capacidade/dia" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3, fill: '#16a34a', stroke: '#0b1220', strokeWidth: 1 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderHeatDemand = () => {
-    const heatZones = [
-      { name: 'Centro / Estação', status: 'Crítico', peak: '12h-14h / 18h-19h', load: 95, drivers: '25-30', dynamic: '1.4x' },
-      { name: 'Leporace / Brasilândia', status: 'Alto', peak: '06h-08h / 17h-19h', load: 82, drivers: '15-20', dynamic: '1.2x' },
-      { name: 'City Petrópolis / Aeroporto', status: 'Médio', peak: '07h-09h / Finais de Semana', load: 68, drivers: '10-15', dynamic: '1.1x' },
-      { name: 'Distrito Industrial', status: 'Focal', peak: '05h-06h / 14h-15h / 22h-23h', load: 55, drivers: '8-12', dynamic: '1.0x' },
-    ];
-    
-    const hourlyDemandData = [
-      { time: '00h', value: 20 }, { time: '02h', value: 10 }, { time: '04h', value: 15 },
-      { time: '06h', value: 60 }, { time: '08h', value: 90 }, { time: '10h', value: 55 },
-      { time: '12h', value: 85 }, { time: '14h', value: 60 }, { time: '16h', value: 70 },
-      { time: '18h', value: 95 }, { time: '20h', value: 75 }, { time: '22h', value: 40 },
-    ];
-
-    const statusColor: Record<string, string> = {
-      Crítico: '#ef4444',
-      Alto: '#f59e0b',
-      Médio: '#eab308',
-      Focal: '#fbbf24',
-    };
-    
-    const ticketBench = [
-      { name: 'Uber', value: 20, fill: '#0b1220' },
-      { name: '99', value: 18, fill: '#f59e0b' },
-      { name: 'Maxim', value: 14.8, fill: '#eab308' },
-      { name: 'Garupa', value: 21, fill: '#e5e7eb' },
-      { name: 'Urban 66', value: 17.5, fill: '#ef4444' },
-      { name: 'TKX Franca', value: 18.5, fill: '#fbbf24' },
-    ];
-
-    return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        {/* Top Section: Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-           {/* Hourly Demand */}
-           <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-black uppercase text-yellow-500 flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    Perfil de Demanda Horária (Média)
-                  </h3>
-                  <p className="text-xs text-slate-500">Concentração de solicitações ao longo do dia</p>
-                </div>
-              </div>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={hourlyDemandData}>
-                    <defs>
-                      <linearGradient id="colorDemand" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#eab308" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="time" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }}
-                      itemStyle={{ color: '#eab308' }}
-                      labelStyle={{ color: '#94a3b8' }}
-                    />
-                    <Area type="monotone" dataKey="value" stroke="#eab308" strokeWidth={3} fillOpacity={1} fill="url(#colorDemand)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-           </div>
-
-           {/* Heat Zones Chart */}
-           <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-black uppercase text-yellow-500 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Intensidade por Zona
-                  </h3>
-                  <p className="text-xs text-slate-500">Taxa de ocupação e demanda relativa</p>
-                </div>
-              </div>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={heatZones} layout="vertical" margin={{ left: 80, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                    <XAxis type="number" stroke="#475569" fontSize={10} hide />
-                    <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={10} width={100} tickLine={false} axisLine={false} />
-                    <Tooltip 
-                      cursor={{fill: 'transparent'}}
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }}
-                      itemStyle={{ color: '#f1f5f9' }}
-                      labelStyle={{ color: '#94a3b8' }}
-                    />
-                    <Bar dataKey="load" name="Taxa de Embarque" radius={[0, 4, 4, 0]} barSize={20}>
-                      {heatZones.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={statusColor[entry.status]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-           </div>
-        </div>
-
-        {/* Zone Details Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {heatZones.map((zone) => (
-            <div key={zone.name} className="bg-slate-900 border border-slate-800 p-4 rounded-xl hover:border-yellow-500/30 transition-all group">
-              <div className="flex justify-between items-start mb-3">
-                <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider`} style={{ backgroundColor: `${statusColor[zone.status]}20`, color: statusColor[zone.status] }}>
-                  {zone.status}
-                </div>
-                <div className="flex items-center gap-1 text-yellow-500">
-                  <Zap className="w-3 h-3" />
-                  <span className="text-xs font-bold">{zone.dynamic}</span>
-                </div>
-              </div>
-              <h4 className="text-sm font-bold text-slate-100 mb-1 group-hover:text-yellow-400 transition-colors">{zone.name}</h4>
-              <div className="space-y-2 mt-3">
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>Pico:</span>
-                  <span className="text-slate-200">{zone.peak}</span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>Drivers Sugeridos:</span>
-                  <span className="text-slate-200">{zone.drivers}</span>
-                </div>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${zone.load}%`, backgroundColor: statusColor[zone.status] }}></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Benchmark Chart */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-sm font-black uppercase text-yellow-500 flex items-center gap-2">
-                <Wallet className="w-4 h-4" />
-                Competitividade de Preço (Ticket Médio)
-              </h3>
-              <p className="text-xs text-slate-500">Comparativo de tarifas praticadas em Franca-SP</p>
-            </div>
-          </div>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ticketBench} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip 
-                  cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }}
-                  itemStyle={{ color: '#f1f5f9' }}
-                  labelStyle={{ color: '#94a3b8' }}
-                  formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Ticket Médio']}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
-                  {ticketBench.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} stroke={entry.name === 'TKX Franca' ? '#fbbf24' : 'none'} strokeWidth={entry.name === 'TKX Franca' ? 2 : 0} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
         </div>
       </div>
     );
@@ -2720,25 +2373,25 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
       const avgDrivers = d.reduce((a, r) => a + r.drivers, 0) / d.length;
       const semesterTotal = avgDrivers > 0 ? totalRides / avgDrivers : 0;
       const monthly = semesterTotal / 6;
-      const weekly = monthly / 4.33; // ~4.33 semanas por mês
+      const weekly = monthly / 4.33; // ~4.33 semanas por mÃªs
       const daily = monthly / 30.5;
       return { label: s.label, semesterTotal, monthly, weekly, daily };
     });
 
     return (
       <div className="space-y-6">
-        <h3 className="text-sm font-black uppercase text-yellow-500">Visão 36 meses</h3>
+        <h3 className="text-sm font-black uppercase text-yellow-500">VisÃ£o 36 meses</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
             <div className="text-[10px] uppercase text-slate-400 font-black">Break-even</div>
-            <div className="text-2xl font-black text-white">{breakEvenIndex !== -1 ? `Mês ${results[breakEvenIndex].month}` : 'Não atingido'}</div>
+            <div className="text-2xl font-black text-white">{breakEvenIndex !== -1 ? `MÃªs ${results[breakEvenIndex].month}` : 'NÃ£o atingido'}</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
             <div className="text-[10px] uppercase text-slate-400 font-black">Payback</div>
-            <div className="text-2xl font-black text-white">{paybackIndex !== -1 ? `Mês ${results[paybackIndex].month}` : '> 36m'}</div>
+            <div className="text-2xl font-black text-white">{paybackIndex !== -1 ? `MÃªs ${results[paybackIndex].month}` : '> 36m'}</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-            <div className="text-[10px] uppercase text-slate-400 font-black">{profitLabel(totalProfit36, 'Lucro Acumulado 36m', 'Prejuízo Acumulado 36m')}</div>
+            <div className="text-[10px] uppercase text-slate-400 font-black">{profitLabel(totalProfit36, 'Lucro Acumulado 36m', 'PrejuÃ­zo Acumulado 36m')}</div>
             <div className={`text-2xl font-black ${profitColor(totalProfit36)}`}><CurrencyDisplay value={profitValue(totalProfit36)} colorClass={profitColor(totalProfit36)} /></div>
           </div>
         </div>
@@ -2764,7 +2417,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
                         <span className="text-xs font-bold text-blue-400">{s.weekly.toFixed(0)}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[7px] text-slate-400">Diária:</span>
+                        <span className="text-[7px] text-slate-400">DiÃ¡ria:</span>
                         <span className="text-xs font-bold text-orange-400">{s.daily.toFixed(1)}</span>
                       </div>
                     </div>
@@ -2790,7 +2443,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
                 {profitLabel(y.data.profit)}: <CurrencyDisplay value={profitValue(y.data.profit)} colorClass={profitColor(y.data.profit)} />
               </div>
               <div className="text-sm text-slate-300">Corridas: {formatNumber(y.data.rides)}</div>
-              <div className="text-sm text-slate-300">Usuários: {formatNumber(y.data.finalUsers)}</div>
+              <div className="text-sm text-slate-300">UsuÃ¡rios: {formatNumber(y.data.finalUsers)}</div>
               <div className="text-sm text-slate-300">Frota: {formatNumber(y.data.finalDrivers)}</div>
             </div>
           ))}
@@ -2999,7 +2652,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
     const m12 = displayProjections[11];
     const m36 = displayProjections[35];
 
-    // Quebra por período (anos 1, 2, 3 e total)
+    // Quebra por perÃ­odo (anos 1, 2, 3 e total)
     const periodSlices = [
       { key: 'y1', label: 'Ano 1', data: displayProjections.slice(0, 12) },
       { key: 'y2', label: 'Ano 2', data: displayProjections.slice(12, 24) },
@@ -3026,7 +2679,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
       const grossRevenue = data.reduce((acc, r) => acc + r.grossRevenue, 0);
       const takeRevenue = data.reduce((acc, r) => acc + r.takeRateRevenue, 0);
       const netProfit = data.reduce((acc, r) => acc + r.netProfit, 0);
-      const valuation = takeRevenue * 4; // múltiplo simples de 4x receita líquida (take rate)
+      const valuation = takeRevenue * 4; // mÃºltiplo simples de 4x receita lÃ­quida (take rate)
 
       const churnPassengers = data.reduce((acc, r, idx) => {
         const prevUsers = idx === 0 ? r.users : data[idx - 1].users;
@@ -3394,7 +3047,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               {alertsPerPeriod.map((ap) => (
                 <div key={ap.label} className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-3 rounded-lg">
-                  <div className="text-[7px] uppercase text-slate-400 font-bold tracking-[0.08em] mb-2">📋 {ap.label}</div>
+                  <div className="text-[7px] uppercase text-slate-400 font-bold tracking-[0.08em] mb-2">📊 {ap.label}</div>
                   <div className="space-y-1 text-[8px] text-slate-300">
                     {ap.alerts.map((alert, idx) => (
                       <div key={idx} className="font-semibold text-slate-200">{alert}</div>
@@ -3405,6 +3058,276 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
             </div>
           );
         })()}
+      </div>
+    );
+  };
+
+  const renderHeatDemand = () => {
+    const MPD = 10.1;
+    const first = displayProjections[0];
+    const supplyCapacity = first?.supplyCapacity || (first?.drivers || 0) * MPD * 30.5;
+    const demandedRides = first?.demandedRides || first?.rides || 0;
+    const demandGap = first?.demandGap || Math.max(0, demandedRides - (first?.rides || 0));
+    const utilization = supplyCapacity > 0 ? ((first?.rides || 0) / supplyCapacity) * 100 : 0;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+          <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Demanda (M1)</div>
+          <div className="text-2xl font-black text-white"><NumberDisplay value={Math.round(demandedRides)} /></div>
+        </div>
+        <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+          <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Capacidade (M1)</div>
+          <div className="text-2xl font-black text-white"><NumberDisplay value={Math.round(supplyCapacity)} /></div>
+        </div>
+        <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+          <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Gap (M1)</div>
+          <div className={`text-2xl font-black ${demandGap > 0 ? 'text-red-400' : 'text-green-300'}`}>
+            <NumberDisplay value={Math.round(demandGap)} />
+          </div>
+        </div>
+        <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+          <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Utilização (M1)</div>
+          <div className={`text-2xl font-black ${utilization > 85 ? 'text-red-400' : utilization > 70 ? 'text-orange-300' : 'text-green-300'}`}>
+            {utilization.toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFestasEventos = () => {
+    const validDates = eventStartStr && eventEndStr && new Date(eventEndStr) >= new Date(eventStartStr);
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const days = validDates ? (Math.floor((new Date(eventEndStr).getTime() - new Date(eventStartStr).getTime()) / msPerDay) + 1) : 0;
+    const baseMonthlyRides = displayProjections[0]?.rides || 0;
+    const baseDailyRides = baseMonthlyRides / 30;
+    const baseEventRides = Math.max(0, Math.round(baseDailyRides * days));
+    const totalEventRides = Math.max(0, Math.round(baseEventRides * (1 + (ridesExtraPct || 0) / 100)));
+
+    const avgFareBase = currentParams.avgFare || 0;
+    const avgFareAdj = avgFareBase * (1 + (dynamicPct || 0) / 100);
+
+    const techFeeFixed = pricingConfig?.tariff?.tech_fee_fixed ?? 0;
+    const takeRatePct = (pricingConfig?.tariff?.take_rate_pct ?? 15) / 100;
+    const tariffBaseAdj = Math.max(0, avgFareAdj - techFeeFixed);
+    const plataformaReceita = totalEventRides * (tariffBaseAdj * takeRatePct + techFeeFixed);
+    const gmvEvent = totalEventRides * avgFareAdj;
+    const extraProfitPerRidePct = avgFareBase > 0 ? ((avgFareAdj - avgFareBase) / avgFareBase) * 100 : 0;
+
+    const MPD = 10.1;
+    const driversCapacity = Math.floor((driversNeeded || 0) * MPD * Math.max(1, days));
+    const coberturaPct = totalEventRides > 0 ? Math.min(100, (driversCapacity / totalEventRides) * 100) : 0;
+    const corridasDiaNecessarias = days > 0 ? Math.ceil(totalEventRides / days) : 0;
+    const corridasPorDriverDia = (driversNeeded || 0) > 0 && days > 0 ? (totalEventRides / days) / driversNeeded : 0;
+    const dailyCapacity = (driversNeeded || 0) * MPD;
+
+    const sCurveWeights = (n: number) => {
+      if (n <= 0) return [] as number[];
+      const mid = (n - 1) * peakPosition;
+      const k = curveIntensity;
+      const raw = Array.from({ length: n }, (_, i) => {
+        const s = 1 / (1 + Math.exp(-k * (i - mid)));
+        return s * (1 - s);
+      });
+      const sum = raw.reduce((a, b) => a + b, 0) || 1;
+      return raw.map(v => v / sum);
+    };
+
+    const weights = distributionMode === 'curvaS' ? sCurveWeights(days) : [];
+    const eventDailyData = Array.from({ length: days }, (_, i) => {
+      const ridesPerDay = distributionMode === 'curvaS' ? Math.round(totalEventRides * (weights[i] || 0)) : corridasDiaNecessarias;
+      return {
+        day: i + 1,
+        rides: ridesPerDay,
+        capacity: dailyCapacity,
+      };
+    });
+
+    const peakIdx = eventDailyData.reduce((maxI, d, i) => (d.rides > (eventDailyData[maxI]?.rides || 0) ? i : maxI), 0);
+    const peakDay = eventDailyData[peakIdx]?.day || 1;
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-black uppercase text-yellow-500">Festas/Eventos</h3>
+            <div className="text-[10px] text-slate-400 font-bold">
+              Tech Fee: {formatCurrency(techFeeFixed)} | Take Rate: {formatPercent(takeRatePct * 100, 2)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em] mb-2">Início</div>
+              <input
+                type="date"
+                value={eventStartStr}
+                onChange={(e) => setEventStartStr(e.target.value)}
+                className="w-full bg-slate-900/60 border border-slate-700/40 rounded-lg px-3 py-2 text-xs text-slate-100"
+              />
+            </div>
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em] mb-2">Fim</div>
+              <input
+                type="date"
+                value={eventEndStr}
+                onChange={(e) => setEventEndStr(e.target.value)}
+                className="w-full bg-slate-900/60 border border-slate-700/40 rounded-lg px-3 py-2 text-xs text-slate-100"
+              />
+            </div>
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em] mb-2">Drivers (evento)</div>
+              <input
+                type="number"
+                value={driversNeeded}
+                onChange={(e) => setDriversNeeded(Number(e.target.value) || 0)}
+                className="w-full bg-slate-900/60 border border-slate-700/40 rounded-lg px-3 py-2 text-xs text-slate-100"
+                min={0}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em]">Dinâmica (Δ tarifa média)</div>
+                <div className="text-xs font-black text-yellow-300">{formatPercent(dynamicPct, 1)}</div>
+              </div>
+              <input
+                type="range"
+                min={-30}
+                max={80}
+                step={1}
+                value={dynamicPct}
+                onChange={(e) => setDynamicPct(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em]">Aumento de corridas (Δ volume)</div>
+                <div className="text-xs font-black text-green-300">{formatPercent(ridesExtraPct, 1)}</div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={300}
+                step={1}
+                value={ridesExtraPct}
+                onChange={(e) => setRidesExtraPct(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em] mb-2">Distribuição</div>
+              <select
+                value={distributionMode}
+                onChange={(e) => setDistributionMode(e.target.value as any)}
+                className="w-full bg-slate-900/60 border border-slate-700/40 rounded-lg px-3 py-2 text-xs text-slate-100"
+              >
+                <option value="constante">Constante</option>
+                <option value="curvaS">Curva-S</option>
+              </select>
+            </div>
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em]">Intensidade (k)</div>
+                <div className="text-xs font-black text-slate-200">{curveIntensity.toFixed(2)}</div>
+              </div>
+              <input
+                type="range"
+                min={0.1}
+                max={2.0}
+                step={0.01}
+                value={curveIntensity}
+                onChange={(e) => setCurveIntensity(Number(e.target.value))}
+                className="w-full"
+                disabled={distributionMode !== 'curvaS'}
+              />
+            </div>
+            <div className="bg-slate-800/40 border border-slate-700/40 p-3 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[8px] uppercase text-slate-400 font-bold tracking-[0.08em]">Pico (posição)</div>
+                <div className="text-xs font-black text-slate-200">{Math.round(peakPosition * 100)}%</div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={peakPosition}
+                onChange={(e) => setPeakPosition(Number(e.target.value))}
+                className="w-full"
+                disabled={distributionMode !== 'curvaS'}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+            <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Dias</div>
+            <div className="text-2xl font-black text-white"><NumberDisplay value={days} /></div>
+          </div>
+          <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+            <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Corridas (evento)</div>
+            <div className="text-2xl font-black text-yellow-300"><NumberDisplay value={totalEventRides} /></div>
+          </div>
+          <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+            <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">GMV evento</div>
+            <div className="text-2xl font-black text-green-300"><CurrencyDisplay value={gmvEvent} /></div>
+          </div>
+          <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+            <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Receita plataforma</div>
+            <div className="text-2xl font-black text-gradient-gold"><CurrencyDisplay value={plataformaReceita} /></div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+            <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Tarifa média (base)</div>
+            <div className="text-xl font-black text-slate-100"><CurrencyDisplay value={avgFareBase} colorClass="text-slate-100" /></div>
+          </div>
+          <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+            <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Tarifa média (dinâmica)</div>
+            <div className="text-xl font-black text-yellow-300"><CurrencyDisplay value={avgFareAdj} /></div>
+            <div className="text-[10px] text-slate-400 mt-1">Δ {formatPercent(extraProfitPerRidePct, 1)}</div>
+          </div>
+          <div className="card-gradient hover-lift bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-slate-700/40 p-4 rounded-xl">
+            <div className="text-[8px] uppercase text-slate-500 font-bold tracking-[0.08em] mb-2">Cobertura</div>
+            <div className={`text-xl font-black ${coberturaPct < 100 ? 'text-orange-300' : 'text-green-300'}`}>{coberturaPct.toFixed(1)}%</div>
+            <div className="text-[10px] text-slate-400 mt-1">Pico: dia {peakDay}</div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-xs font-black uppercase text-yellow-400 tracking-[0.08em]">Distribuição diária</h3>
+              <div className="text-[10px] text-slate-400 mt-1">Necessário: {corridasDiaNecessarias}/dia | Corridas/driver/dia: {corridasPorDriverDia.toFixed(2)}</div>
+            </div>
+            <div className="text-[10px] text-slate-400 font-bold">Capacidade/dia: {dailyCapacity.toFixed(1)}</div>
+          </div>
+          <div className="h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={eventDailyData}>
+                <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="day" stroke="#475569" fontSize={10} />
+                <YAxis stroke="#475569" fontSize={10} />
+                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'transparent', stroke: 'transparent' }} />
+                <Legend content={<NeutralLegend />} />
+                <Bar dataKey="rides" name="Corridas/dia" fill="#fbbf24" radius={[6, 6, 2, 2]} />
+                <Line type="monotone" dataKey="capacity" name="Capacidade/dia" stroke="#22c55e" strokeWidth={3} dot={false} />
+                <ReferenceLine x={peakDay} stroke="#ef4444" strokeDasharray="4 3" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
     );
   };
@@ -3482,7 +3405,7 @@ const DashboardContent: React.FC<DashboardProps> = ({ worldMode, toggleWorld }) 
       case 16:
         return <ImplementationTab currentParams={currentParams} />;
       case 17:
-        return <InitialPlanningTab currentParams={currentParams} updateCurrentParam={updateCurrentParam} worldMode={worldMode} />;
+        return <InitialPlanningTab currentParams={currentParams} updateCurrentParam={updateCurrentParam} worldMode={worldMode} pricingConfig={pricingConfig} />;
       case 18:
           return <SensitivityAnalysisTab
             currentParams={currentParams}
@@ -3575,14 +3498,14 @@ case 19:
 
           {lastMonth && (
             <div className="card-gradient bg-gradient-to-br from-slate-900/90 to-slate-800/70 border border-slate-700/50 p-5 rounded-xl text-slate-200 text-xs shadow-xl">
-              <div className="font-black uppercase text-[8px] text-yellow-400 tracking-[0.08em] mb-3">📊 Visão 36 meses</div>
+              <div className="font-black uppercase text-[8px] text-yellow-400 tracking-[0.08em] mb-3">ðŸ“Š VisÃ£o 36 meses</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <div className="bg-slate-800/50 p-2 rounded-lg border border-slate-700/30">
                   <div className="text-[7px] text-slate-400 uppercase font-bold mb-1">Frota final</div>
                   <div className="text-lg font-black text-white"><NumberDisplay value={lastMonth.drivers} /></div>
                 </div>
                 <div className="bg-slate-800/50 p-2 rounded-lg border border-slate-700/30">
-                  <div className="text-[7px] text-slate-400 uppercase font-bold mb-1">Usuários finais</div>
+                  <div className="text-[7px] text-slate-400 uppercase font-bold mb-1">UsuÃ¡rios finais</div>
                   <div className="text-lg font-black text-white"><NumberDisplay value={lastMonth.users} /></div>
                 </div>
                 <div className="bg-slate-800/50 p-2 rounded-lg border border-slate-700/30">
@@ -3590,7 +3513,7 @@ case 19:
                   <div className="text-lg font-black text-gradient-gold"><CurrencyDisplay value={displayProjections.reduce((acc, r) => acc + r.grossRevenue, 0)} /></div>
                 </div>
                 <div className="bg-slate-800/50 p-2 rounded-lg border border-slate-700/30">
-                  <div className="text-[7px] text-slate-400 uppercase font-bold mb-1">{profitLabel(lastMonth.accumulatedProfit, 'Lucro acumulado', 'Prejuízo acumulado')}</div>
+                  <div className="text-[7px] text-slate-400 uppercase font-bold mb-1">{profitLabel(lastMonth.accumulatedProfit, 'Lucro acumulado', 'PrejuÃ­zo acumulado')}</div>
                   <div className={`text-lg font-black ${profitColor(lastMonth.accumulatedProfit, 'text-gradient-green', 'text-gradient-red')}`}>
                     <CurrencyDisplay value={profitValue(lastMonth.accumulatedProfit)} colorClass={profitColor(lastMonth.accumulatedProfit, 'text-gradient-green', 'text-gradient-red')} />
                   </div>
@@ -3621,8 +3544,9 @@ case 19:
 }; // <--- Fecha o componente App
 
 const App: React.FC = () => {
-  const [worldMode, setWorldMode] = useState<'Virtual' | 'Real'>(() => {
-    return (localStorage.getItem('tkx_world_mode') as 'Virtual' | 'Real') || 'Virtual';
+  type WorldMode = 'Virtual' | 'Real';
+  const [worldMode, setWorldMode] = useState<WorldMode>(() => {
+    return (localStorage.getItem('tkx_world_mode') as WorldMode) || 'Virtual';
   });
   const [appKey, setAppKey] = useState(0);
 
@@ -3643,17 +3567,17 @@ const App: React.FC = () => {
     if (nextParams) {
       localStorage.setItem('tkx_simulation_params', nextParams);
     } else {
-      // Se não houver estado salvo:
+      // Se nÃ£o houver estado salvo:
       if (nextMode === 'Real') {
-        // Mundo Real: Começa com sliders de custo zerados (apenas na primeira vez)
+        // Mundo Real: ComeÃ§a com sliders de custo zerados (apenas na primeira vez)
         localStorage.setItem('tkx_simulation_params', JSON.stringify(ZERO_PARAMS));
       } else {
-        // Mundo Virtual: Carrega defaults do hook (que serão atualizados pelo useEffect com VIRTUAL_SCENARIOS)
+        // Mundo Virtual: Carrega defaults do hook (que serÃ£o atualizados pelo useEffect com VIRTUAL_SCENARIOS)
         localStorage.removeItem('tkx_simulation_params');
       }
     }
 
-    // Atualiza estado e força remontagem
+    // Atualiza estado e forÃ§a remontagem
     setWorldMode(nextMode);
     localStorage.setItem('tkx_world_mode', nextMode);
     setAppKey(prev => prev + 1);

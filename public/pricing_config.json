@@ -1,0 +1,68 @@
+{
+  "tariff": {
+    "base_fare": 4.0,
+    "per_km": 2.02,
+    "min_fare": 9.0,
+    "tech_fee_fixed": 0.7,
+    "take_rate_pct": 15.0,
+    "included_km": 0.0
+  },
+  "dynamic_schedules": [
+    {
+      "periodo": "Madrugada",
+      "hora_inicio": "00:00",
+      "hora_fim": "05:59",
+      "multiplicador": 1.2
+    },
+    {
+      "periodo": "Normal",
+      "hora_inicio": "06:00",
+      "hora_fim": "17:59",
+      "multiplicador": 1.0
+    },
+    {
+      "periodo": "Pico",
+      "hora_inicio": "18:00",
+      "hora_fim": "20:59",
+      "multiplicador": 1.1
+    },
+    {
+      "periodo": "Noite",
+      "hora_inicio": "21:00",
+      "hora_fim": "23:59",
+      "multiplicador": 1.2
+    }
+  ],
+  "heat_zones": [
+    {
+      "zone": "Centro/Estação",
+      "multiplier": 1.4
+    },
+    {
+      "zone": "Leporace/Brasilândia",
+      "multiplier": 1.2
+    },
+    {
+      "zone": "City Petrópolis/Aeroporto",
+      "multiplier": 1.1
+    },
+    {
+      "zone": "Distrito Industrial",
+      "multiplier": 1.0
+    }
+  ],
+  "event_multipliers": {
+    "evento": {
+      "min": 1.8,
+      "max": 2.5
+    },
+    "chuva": {
+      "min": 1.8,
+      "max": 2.5
+    }
+  },
+  "source": {
+    "db_path": "data/tkx_franca.db",
+    "generated_at": ""
+  }
+}

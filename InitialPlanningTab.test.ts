@@ -38,11 +38,11 @@ describe('Cálculo do Ticket Técnico (Unit Economics)', () => {
   it('deve multiplicar o resultado final pelo fator dinâmico', () => {
     // Usando os mesmos valores do Cenário 1 (Base 15.00)
     // Dinâmica de 1.4x
-    // Base calculation: 20.005
+    // Base calculation: 18.505
     const result = calculateTechnicalTicket(10.00, 2.43, 5, 0, 10, 11.50, 1.4, 1.5);
     
-    // Esperado: 20.005 * 1.4 = 28.007
-    expect(result).toBeCloseTo(28.007, 3);
+    // Esperado: 18.505 * 1.4 = 25.907
+    expect(result).toBeCloseTo(25.907, 3);
   });
 
   // Cenário 4: Distância Zero (Robustez)

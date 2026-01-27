@@ -54,6 +54,8 @@ export const useViability = () => {
       fidelidadePassageirosAnual: 5000.00,
       reservaOperacionalGMV: 0.00,
       takeRateEfetivo: 15,
+      marketPopulation: undefined,
+      marketSamPercent: undefined,
       currentUsersReal: undefined
     }, 
     [ScenarioType.PESSIMISTA]: { 
@@ -122,6 +124,8 @@ export const useViability = () => {
       fidelidadePassageirosAnual: 5000.00,
       reservaOperacionalGMV: 0.00,
       takeRateEfetivo: 15,
+      marketPopulation: undefined,
+      marketSamPercent: undefined,
       currentUsersReal: undefined
     } 
   };

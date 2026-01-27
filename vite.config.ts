@@ -40,6 +40,9 @@ export default defineConfig(async ({ mode }) => {
     return {
       // AJUSTE FINAL: Base de produção agora aponta para App-tkx-Franca
       base: mode === 'production' ? '/App-tkx-Franca/' : '/',
+      test: {
+        exclude: ['e2e/**']
+      },
       server: {
         port: 3001,
         host: '0.0.0.0',

@@ -15,10 +15,13 @@ export const calculateProjections = (
   
   // --- TRAVAS ESTRATÉGICAS ---
   const TETO_MOTORISTAS_FINAL = 500;
-  const POPULACAO_FRANCA = 350000;
-  const SOM_OBJETIVO = 0.15; // 15.00%
-  const MAX_USERS_POSSIVEIS = POPULACAO_FRANCA * SOM_OBJETIVO;
+  const marketPopulation = typeof params.marketPopulation === 'number' ? params.marketPopulation : 350000;
+  const marketSamPercent = typeof params.marketSamPercent === 'number' ? params.marketSamPercent : 50;
+  const marketSam = marketPopulation * (marketSamPercent / 100);
+  const marketSomPercent = typeof params.marketSomPercent === 'number' ? params.marketSomPercent : 15;
+  const MAX_USERS_POSSIVEIS = marketSam * (marketSomPercent / 100);
   const TAKE_RATE_PADRAO = 0.15; // 15.00%
+  const TECH_FEE_FIXED = 0.70; // Taxa de Tecnologia fixa por corrida
 
   // Sazonalidade Mensal (Pesos de Mercado de Franca)
   const SAZONALIDADE: Record<number, number> = {
@@ -65,7 +68,13 @@ export const calculateProjections = (
     // 4. FINANCEIRO
     const avgFareAjustada = (params.avgFare || 0) * (1 + (fatorSazo * 0.05));
     const grossRevenue = actualRides * avgFareAjustada;
-    const takeRateRevenue = grossRevenue * TAKE_RATE_PADRAO;
+    // Regra: comissão 15% somente sobre a tarifa (sem Tech Fee)
+    // Consideramos avgFareAjustada como preço pago pelo passageiro (inclui Tech Fee quando aplicável)
+    const tariffUnit = Math.max(0, avgFareAjustada - TECH_FEE_FIXED);
+    const commissionUnit = tariffUnit * TAKE_RATE_PADRAO;
+    const techFeeRevenue = actualRides * TECH_FEE_FIXED;
+    const takeRateGross = actualRides * commissionUnit;
+    const takeRateRevenue = takeRateGross + techFeeRevenue;
     const taxes = takeRateRevenue * 0.112; 
     const variableCosts = actualRides * 0.40; 
     const techCost = actualRides * 0.15; // Custo de processamento de tecnologia
@@ -76,7 +85,8 @@ export const calculateProjections = (
     const netProfit = takeRateRevenue - taxes - variableCosts - marketing - fixedCosts - techCost;
     accumulatedProfit += netProfit;
 
-    const netPerDriver = currentDrivers > 0 ? (grossRevenue - takeRateRevenue) / currentDrivers : 0;
+    // Receita líquida do motorista = GMV - comissão (a tech fee não compõe repasse)
+    const netPerDriver = currentDrivers > 0 ? (grossRevenue - takeRateGross - techFeeRevenue) / currentDrivers : 0;
 
     results.push({
       month: m + 1,
@@ -86,7 +96,7 @@ export const calculateProjections = (
       users: Math.round(currentUsers),
       rides: Math.round(actualRides),
       grossRevenue,
-      takeRateGross: grossRevenue * 0.15,
+      takeRateGross,
       cashback: 0,
       takeRateRevenue,
       taxes,

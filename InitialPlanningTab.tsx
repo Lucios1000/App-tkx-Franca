@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SimulationParams } from './types';
+import { calcPricing, calcSplitFromPassengerPrice, PricingTariffConfig } from './services/pricingEngine';
 import { 
   DollarSign, Car, TrendingUp, MapPin, Users, Target, 
   Calculator, AlertTriangle, CheckCircle2, Building2,
@@ -14,6 +15,25 @@ interface InitialPlanningTabProps {
   currentParams: SimulationParams;
   updateCurrentParam: (key: keyof SimulationParams, value: number) => void;
   worldMode?: 'Virtual' | 'Real';
+  pricingConfig?: {
+    tariff?: {
+      base_fare?: number;
+      per_km?: number;
+      min_fare?: number;
+      tech_fee_fixed?: number;
+      take_rate_pct?: number;
+      included_km?: number;
+    };
+    dynamic_schedules?: Array<{
+      periodo: string;
+      hora_inicio: string;
+      hora_fim: string;
+      multiplicador: number;
+    }>;
+    source?: {
+      generated_at?: string;
+    };
+  } | null;
 }
 
 // Dados de demonstração para preenchimento automático de parâmetros técnicos
@@ -49,7 +69,7 @@ export const calculateTechnicalTicket = (
   return Math.max(minFare, cost * dynamicFactor);
 };
 
-export const InitialPlanningTab: React.FC<InitialPlanningTabProps> = ({ currentParams, updateCurrentParam, worldMode = 'Virtual' }) => {
+export const InitialPlanningTab: React.FC<InitialPlanningTabProps> = ({ currentParams, updateCurrentParam, worldMode = 'Virtual', pricingConfig }) => {
   // --- Estado Local para Inputs Estratégicos ---
   const [ufs, setUfs] = useState<{ id: number; sigla: string; nome: string }[]>([]);
   const [cities, setCities] = useState<{ id: number; nome: string }[]>([]);
@@ -61,7 +81,27 @@ export const InitialPlanningTab: React.FC<InitialPlanningTabProps> = ({ currentP
   
   const [samPercent, setSamPercent] = useState(50); // 40-60% sugestão
   const [shareTarget, setShareTarget] = useState(15); // Market Share Alvo (Sempre iniciar em 15%)
-  
+
+  const sam = useMemo(() => {
+    return population * (samPercent / 100);
+  }, [population, samPercent]);
+
+  const som = useMemo(() => {
+    return sam * (shareTarget / 100);
+  }, [sam, shareTarget]);
+
+  useEffect(() => {
+    updateCurrentParam('marketPopulation', population as any);
+  }, [population]);
+
+  useEffect(() => {
+    updateCurrentParam('marketSamPercent', samPercent as any);
+  }, [samPercent]);
+
+  useEffect(() => {
+    updateCurrentParam('marketSomPercent', shareTarget as any);
+  }, [shareTarget]);
+
   // Configuração Técnica
   const [tariffSchedules, setTariffSchedules] = useState([
     { id: 'dawn', label: 'Madrugada (00h-06h)', start: 0, end: 6, dynamic: 1.4, basePrice: 13.00 },
@@ -95,10 +135,59 @@ export const InitialPlanningTab: React.FC<InitialPlanningTabProps> = ({ currentP
   // Custos Unitários Fixos (DRE Unitário)
   const [gatewayFeePct, setGatewayFeePct] = useState(2.5);
   const [insuranceFixed, setInsuranceFixed] = useState(0.60);
-  const [techFeeFixed, setTechFeeFixed] = useState(0.40);
+  const [techFeeFixed, setTechFeeFixed] = useState(0.70);
   const [legalProvision, setLegalProvision] = useState(0.35);
   const [trafficContingencyPct, setTrafficContingencyPct] = useState(0);
-  
+
+  useEffect(() => {
+    if (!pricingConfig) return;
+
+    const appliedKey = 'tkx_pricing_config_applied_v1';
+    if (localStorage.getItem(appliedKey)) return;
+
+    const t = pricingConfig.tariff;
+    if (t) {
+      if (typeof t.per_km === 'number') setCostPerKm(t.per_km);
+      if (typeof t.min_fare === 'number') setMinFare(t.min_fare);
+      if (typeof t.included_km === 'number') setIncludedKm(t.included_km);
+      if (typeof t.tech_fee_fixed === 'number') setTechFeeFixed(t.tech_fee_fixed);
+
+      if (typeof t.base_fare === 'number') {
+        setTariffSchedules(prev => prev.map(s => ({ ...s, basePrice: t.base_fare as number })));
+      }
+    }
+
+    if (Array.isArray(pricingConfig.dynamic_schedules) && pricingConfig.dynamic_schedules.length) {
+      const parseHour = (hhmm: string) => {
+        const [h] = hhmm.split(':');
+        const hour = Number(h);
+        return Number.isFinite(hour) ? hour : 0;
+      };
+
+      const basePrice = typeof t?.base_fare === 'number' ? t.base_fare : 10.0;
+      const next = pricingConfig.dynamic_schedules.map((s, idx) => {
+        const start = parseHour(s.hora_inicio);
+        const endRaw = parseHour(s.hora_fim);
+        const end = endRaw === 0 ? 24 : endRaw;
+        return {
+          id: `${idx}`,
+          label: `${s.periodo} (${s.hora_inicio}-${s.hora_fim})`,
+          start,
+          end,
+          dynamic: typeof s.multiplicador === 'number' ? s.multiplicador : 1.0,
+          basePrice,
+        };
+      });
+
+      if (next.length) {
+        setTariffSchedules(next as any);
+        setSelectedScheduleId(next[0].id);
+      }
+    }
+
+    localStorage.setItem(appliedKey, 'true');
+  }, [pricingConfig]);
+
   // Custos do Motorista (Novos parâmetros)
   const [driverFuelCost, setDriverFuelCost] = useState(0.58);
   const [driverMaintenanceCost, setDriverMaintenanceCost] = useState(0.59);
@@ -123,6 +212,40 @@ export const InitialPlanningTab: React.FC<InitialPlanningTabProps> = ({ currentP
     const updated = [...competitors];
     (updated[index] as any)[field] = value;
     setCompetitors(updated);
+  };
+
+  const exportCompetitorsCSV = () => {
+    const rows = competitors.map((c) => ({
+      name: c.name,
+      baseFare: c.baseFare,
+      pricePerKm: c.pricePerKm,
+      pricePerMin: c.pricePerMin,
+      minFare: c.minFare,
+    }));
+
+    const headers = Object.keys(rows[0] || {}).join(',');
+    const body = rows
+      .map((r) => [r.name, r.baseFare, r.pricePerKm, r.pricePerMin, r.minFare].join(','))
+      .join('\n');
+
+    const csv = `${headers}\n${body}`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `competitors_${selectedCity}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const resetTariffs = () => {
+    setTariffSchedules([
+      { id: 'dawn', label: 'Madrugada (00h-06h)', start: 0, end: 6, dynamic: 1.4, basePrice: 13.00 },
+      { id: 'normal', label: 'Normal (06h-18h)', start: 6, end: 18, dynamic: 1.0, basePrice: 10.10 },
+      { id: 'peak', label: 'Pico (18h-21h)', start: 18, end: 21, dynamic: 1.1, basePrice: 10.80 },
+      { id: 'night', label: 'Noite (21h-00h)', start: 21, end: 24, dynamic: 1.2, basePrice: 11.50 },
+    ]);
+    setSelectedScheduleId('normal');
   };
 
   // --- Gerenciamento de Presets ---
@@ -218,13 +341,20 @@ CREATE TABLE IF NOT EXISTS clientes (
       const dist = 2 + Math.random() * 10; // 2-12km
       const time = dist * 2; 
 
-      const totalValue = calculateTechnicalTicket(
-        schedule.basePrice, costPerKm, dist, costPerMin, time, minFare, schedule.dynamic, includedKm
-      );
+      const cfg: PricingTariffConfig = {
+        baseFare: schedule.basePrice,
+        perKm: costPerKm,
+        includedKm,
+        minFare,
+        techFeeFixed,
+        takeRatePct: 15,
+      };
+      const pricing = calcPricing(cfg, { distanceKm: dist, dynamicMultiplier: schedule.dynamic, includeTechFee: enableTech });
+      const totalValue = pricing.passengerPrice;
 
       const gateway = enableGateway ? totalValue * (gatewayFeePct / 100) : 0;
       const fixed = (enableInsurance ? insuranceFixed : 0) + (enableTech ? techFeeFixed : 0) + (enableLegal ? legalProvision : 0);
-      const takeRate = totalValue * 0.15;
+      const takeRate = pricing.platformCommission;
       const net = totalValue - gateway - fixed - takeRate;
       const driverCosts = enableDriverCosts ? dist * (driverFuelCost + driverMaintenanceCost) : 0;
       const realProfit = net - driverCosts;
@@ -392,7 +522,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     setAvgTime(d.avgTime || 12);
     setGatewayFeePct(d.gatewayFeePct || 2.5);
     setInsuranceFixed(d.insuranceFixed || 0.60);
-    setTechFeeFixed(d.techFeeFixed || 0.40);
+    setTechFeeFixed(d.techFeeFixed || 0.70);
     setLegalProvision(d.legalProvision || 0.35);
     setTrafficContingencyPct(d.trafficContingencyPct || 1.5);
     setDriverFuelCost(d.driverFuelCost || 0.58);
@@ -410,51 +540,21 @@ CREATE TABLE IF NOT EXISTS clientes (
     setSelectedPresetId('');
   };
 
-  const resetTariffs = () => {
-    setTariffSchedules([
-      { id: 'dawn', label: 'Madrugada (00h-06h)', start: 0, end: 6, dynamic: 1.2, basePrice: 10.00 },
-      { id: 'normal', label: 'Normal (06h-18h)', start: 6, end: 18, dynamic: 1.0, basePrice: 10.00 },
-      { id: 'peak', label: 'Pico (18h-21h)', start: 18, end: 21, dynamic: 1.1, basePrice: 10.00 },
-      { id: 'night', label: 'Noite (21h-00h)', start: 21, end: 24, dynamic: 1.2, basePrice: 10.00 },
-    ]);
-    setCostPerKm(2.43);
-    setCostPerMin(0);
-    setIncludedKm(1.5);
-    setMinFare(11.50);
-  };
+  const pricingCfg: PricingTariffConfig = useMemo(() => ({
+    baseFare,
+    perKm: costPerKm,
+    includedKm,
+    minFare,
+    techFeeFixed,
+    takeRatePct: 15,
+  }), [baseFare, costPerKm, includedKm, minFare, techFeeFixed]);
 
-  const exportCompetitorsCSV = () => {
-    const headers = ['Player', 'Tarifa Estimada', 'Diferenca %'];
-    const rows = competitors.map(c => {
-      // Cálculo direto: Max(Mínima, Base + (Km * Dist) + (Min * Tempo))
-      const estValue = Math.max(c.minFare, c.baseFare + (c.pricePerKm * avgDistance) + (c.pricePerMin * avgTime));
-      const diff = practicedTicket > 0 ? ((estValue - practicedTicket) / practicedTicket) * 100 : 0;
-      return [
-        c.name, 
-        estValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 
-        `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`
-      ];
-    });
-    
-    rows.push(['TKX Franca', practicedTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Ref.']);
+  const technicalPricing = useMemo(
+    () => calcPricing(pricingCfg, { distanceKm: avgDistance, dynamicMultiplier: dynamicFactor, includeTechFee: enableTech }),
+    [pricingCfg, avgDistance, dynamicFactor, enableTech]
+  );
 
-    const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `competidores_tkx_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // --- Cálculos ---
-  const tam = population;
-  const sam = Math.round(tam * (samPercent / 100));
-  const som = Math.round(sam * (shareTarget / 100));
-
-  const technicalTicket = calculateTechnicalTicket(baseFare, costPerKm, avgDistance, costPerMin, avgTime, minFare, dynamicFactor, includedKm);
+  const technicalTicket = technicalPricing.passengerPrice;
   const practicedTicket = currentParams.avgFare;
   const priceDelta = practicedTicket - technicalTicket;
   const isUnderPriced = priceDelta < 0;
@@ -462,7 +562,11 @@ CREATE TABLE IF NOT EXISTS clientes (
   // Unit Economics
   const gmv = practicedTicket;
   const gatewayCost = enableGateway ? gmv * (gatewayFeePct / 100) : 0;
-  const takeRateGross = gmv * 0.15;
+  const practicedSplit = useMemo(
+    () => calcSplitFromPassengerPrice({ passengerPrice: gmv, techFeeFixed, takeRatePct: 15, includeTechFee: enableTech }),
+    [gmv, techFeeFixed, enableTech]
+  );
+  const takeRateGross = practicedSplit.platformCommission;
   const trafficReserve = takeRateGross * (trafficContingencyPct / 100);
   
   const insuranceCost = enableInsurance ? insuranceFixed : 0;
@@ -487,10 +591,18 @@ CREATE TABLE IF NOT EXISTS clientes (
   const hourlyData = useMemo(() => {
     return Array.from({ length: 24 }, (_, h) => {
       const s = tariffSchedules.find(ts => h >= ts.start && h < ts.end) || tariffSchedules[0];
-      const cost = calculateTechnicalTicket(s.basePrice, costPerKm, avgDistance, costPerMin, avgTime, minFare, s.dynamic, includedKm);
-      return { hour: h, price: cost, label: s.label, basePrice: s.basePrice };
+      const cfg: PricingTariffConfig = {
+        baseFare: s.basePrice,
+        perKm: costPerKm,
+        includedKm,
+        minFare,
+        techFeeFixed,
+        takeRatePct: 15,
+      };
+      const pricing = calcPricing(cfg, { distanceKm: avgDistance, dynamicMultiplier: s.dynamic, includeTechFee: enableTech });
+      return { hour: h, price: pricing.passengerPrice, label: s.label, basePrice: s.basePrice };
     });
-  }, [tariffSchedules, costPerKm, avgDistance, costPerMin, avgTime, minFare, includedKm]);
+  }, [tariffSchedules, costPerKm, avgDistance, minFare, includedKm, techFeeFixed, enableTech]);
 
   // Cálculo do Custo Técnico Médio
   const avgTechnicalCost = useMemo(() => {
@@ -510,8 +622,8 @@ CREATE TABLE IF NOT EXISTS clientes (
     const valorBruto = Math.max(valorComDinamica, minFare);
 
     const taxaPlataformaPercent = 15;
-    const taxaPlataforma = valorBruto * (taxaPlataformaPercent / 100);
-    const valorLiquido = valorBruto - taxaPlataforma;
+    const taxaPlataforma = technicalPricing.platformCommission;
+    const valorLiquido = technicalPricing.driverRepasse;
 
     const custoKm = enableDriverCosts ? (driverFuelCost + driverMaintenanceCost) : 0;
     const despesasTotais = avgDistance * custoKm;
@@ -521,7 +633,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     return {
         kmAdicionais, valorAdicional, valorBruto, taxaPlataforma, valorLiquido, despesasTotais, lucroLiquido
     };
-  }, [avgDistance, includedKm, costPerKm, baseFare, minFare, dynamicFactor, driverFuelCost, driverMaintenanceCost, enableDriverCosts]);
+  }, [avgDistance, includedKm, costPerKm, baseFare, minFare, dynamicFactor, driverFuelCost, driverMaintenanceCost, enableDriverCosts, technicalPricing.platformCommission, technicalPricing.driverRepasse]);
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatNumber = (val: number) => val.toLocaleString('pt-BR');
